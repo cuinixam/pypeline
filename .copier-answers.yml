@@ -1,0 +1,14 @@
+# Changes here will be overwritten by Copier
+_commit: afe4564
+_src_path: .
+copyright_year: '2024'
+documentation: true
+email: me@cuinixam.com
+full_name: cuinixam
+github_username: cuinixam
+open_source_license: MIT
+package_name: pypeline
+project_name: Python Pipeline
+project_short_description: Configure and execute steps for developing a python package.
+project_slug: pypeline
+
