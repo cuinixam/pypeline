@@ -13,6 +13,7 @@ title: Python Pipeline
 ```{image} ./_static/python-logo-only.svg
 :width: 150px
 ```
+
 :::
 
 :::{grid-item}
@@ -24,7 +25,6 @@ Configure and execute steps for developing a python package.
 
 ::::
 
-
 ---
 
 ```{toctree}
@@ -35,7 +35,6 @@ getting_started/index.md
 features/index.md
 internals/index.md
 ```
-
 
 ```{toctree}
 :hidden:

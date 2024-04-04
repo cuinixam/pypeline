@@ -5,8 +5,8 @@
 Add here some documentation for your design.
 
 ```{mermaid} figures/design.mmd
-```
 
+```
 
 ## MyApp
 
@@ -28,8 +28,6 @@ Add here some documentation for your design.
 ```
 
 ### Reports
-
-
 
 ```{item-matrix} Trace requirements to implementation
     :source: REQ-MY_APP
@@ -59,7 +57,7 @@ Add here some documentation for your design.
 
 Add here some documentation for your class.
 
-```{eval-rst}  
+```{eval-rst}
 .. autoclass:: pypeline.my_app::MyApp
    :members:
    :undoc-members:
@@ -67,12 +65,11 @@ Add here some documentation for your class.
 
 ## Testing
 
-```{eval-rst}  
+```{eval-rst}
 .. automodule:: test_my_app
    :members:
    :show-inheritance:
 ```
-
 
 ## Brainstorming
 
@@ -124,11 +121,9 @@ pypeline.ps1
 This is required to find custom pipeline steps defined in `.py` files inside the project.
 
 ```yaml
-
 pipeline:
   - step: MyStep
     file: scripts/steps/my_step.py
-
 ```
 
 **Execution Context**
@@ -138,9 +133,8 @@ The steps can add information to the execution context to be available for the n
 
 Examples:
 
-* a step installing tools can register tools with their bin folders to be used by subsequent steps
-* code generators can provide include paths
-
+- a step installing tools can register tools with their bin folders to be used by subsequent steps
+- code generators can provide include paths
 
 **User Request**
 
@@ -148,21 +142,17 @@ Information about a specific `request` that a user wants to execute.
 This is relevant for local builds, where a user might want to execute specific targets.
 One might only want to execute a compile for a component or a specific code generation step.
 
-
 **Pipeline Step**
 
 The building blocks of a pipeline.
 
 **Pipeline Step Reference**
 
-This is just the name of the step. One needs this to be able to distiguish between finding a step and instantiating and executing a step.
+This is just the name of the step. One needs this to be able to distinguish between finding a step and instantiating and executing a step.
 
 **Project Slurper**
 
 This is required to find all relevant configuration files.
 If one decides to use multiple configuration files, to define pipeline steps, the project slurper shall be used to find all of them.
 
-
-
 ### Feature proposals
-
