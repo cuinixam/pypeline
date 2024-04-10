@@ -1,4 +1,3 @@
-from pathlib import Path
 
 from pypeline.domain.artifacts import ProjectArtifactsLocator
 from pypeline.main import run

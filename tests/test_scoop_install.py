@@ -5,11 +5,10 @@ from typing import List
 
 from py_app_dev.core.scoop_wrapper import InstalledScoopApp
 
-from pypeline.domain.execution_context import ExecutionContext
 from pypeline.steps.scoop_install import ScoopInstall
 
 
-def test_scoop_install(execution_context: ExecutionContext) -> None:
+def test_scoop_install(execution_context: unittest.mock.Mock) -> None:
     scoop_file_json = execution_context.project_root_dir.joinpath("scoopfile.json")
     scoop_file_json.write_text("")
     scoop_install = ScoopInstall(execution_context, execution_context.project_root_dir)

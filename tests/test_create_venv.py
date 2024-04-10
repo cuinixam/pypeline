@@ -1,10 +1,10 @@
 from pathlib import Path
+from unittest.mock import Mock
 
-from pypeline.domain.execution_context import ExecutionContext
 from pypeline.steps.create_venv import CreateVEnv
 
 
-def test_create_venv(execution_context: ExecutionContext) -> None:
+def test_create_venv(execution_context: Mock) -> None:
     bootstrap_py = execution_context.project_root_dir.joinpath("bootstrap.py")
     bootstrap_py.write_text("")
     create_venv = CreateVEnv(execution_context, Path("out"))

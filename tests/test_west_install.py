@@ -1,11 +1,10 @@
 from pathlib import Path
-from unittest.mock import call
+from unittest.mock import Mock, call
 
-from pypeline.domain.execution_context import ExecutionContext
 from pypeline.steps.west_install import WestInstall
 
 
-def test_west_install(execution_context: ExecutionContext) -> None:
+def test_west_install(execution_context: Mock) -> None:
     west_install = WestInstall(execution_context, Path("out"))
     west_install.run()
 

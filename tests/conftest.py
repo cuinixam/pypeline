@@ -54,7 +54,7 @@ def artifacts_locator(project: Path) -> ProjectArtifactsLocator:
 
 
 @pytest.fixture
-def execution_context(project) -> ExecutionContext:
+def execution_context(project: Path) -> Mock:
     execution_context = Mock(spec=ExecutionContext)
     execution_context.project_root_dir = project
     execution_context.create_artifacts_locator.return_value = ProjectArtifactsLocator(project)

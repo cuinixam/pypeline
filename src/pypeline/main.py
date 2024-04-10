@@ -8,6 +8,7 @@ from py_app_dev.core.logging import logger, setup_logger, time_it
 
 from pypeline import __version__
 from pypeline.domain.project_slurper import ProjectSlurper
+from pypeline.kickstart.create import KickstartProject
 from pypeline.pypeline import PipelineScheduler, PipelineStepsExecutor
 
 package_name = "pypeline"
@@ -26,8 +27,12 @@ def version(
 
 @app.command()
 @time_it("init")
-def init(project_dir: Path = typer.Option(Path.cwd().absolute(), help="The project directory"), enable: bool = False) -> None:  # noqa: B008
-    logger.warning(f"TODO: Initialize project in {project_dir} with enable={enable}")
+def init(
+    project_dir: Path = typer.Option(Path.cwd().absolute(), help="The project directory"),  # noqa: B008
+    bootstrap_only: bool = typer.Option(False, help="Initialize only the bootstrap files."),
+    force: bool = typer.Option(False, help="Force the initialization of the project even if the directory is not empty."),
+) -> None:
+    KickstartProject(project_dir, bootstrap_only, force).run()
 
 
 @app.command()
