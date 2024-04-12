@@ -22,7 +22,7 @@ class WestInstall(PipelineStep):
         return self.project_root_dir.joinpath("west.yaml")
 
     def run(self) -> int:
-        self.logger.debug(f"Run {self.get_name()} stage. Output dir: {self.output_dir}")
+        self.logger.debug(f"Run {self.get_name()} step. Output dir: {self.output_dir}")
         try:
             self.execution_context.create_process_executor(
                 [

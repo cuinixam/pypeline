@@ -41,6 +41,10 @@ class ScoopInstallExecutionInfo(DataClassJSONMixin):
         file_path.write_text(self.to_json_string())
 
 
+def create_scoop_wrapper() -> ScoopWrapper:
+    return ScoopWrapper()
+
+
 class ScoopInstall(PipelineStep):
     def __init__(self, execution_context: ExecutionContext, output_dir: Path) -> None:
         super().__init__(execution_context, output_dir)
@@ -62,8 +66,8 @@ class ScoopInstall(PipelineStep):
         return self.project_root_dir.joinpath("scoopfile.json")
 
     def run(self) -> int:
-        self.logger.debug(f"Run {self.get_name()} stage. Output dir: {self.output_dir}")
-        installed_apps = ScoopWrapper().install(self.scoop_file)
+        self.logger.debug(f"Run {self.get_name()} step. Output dir: {self.output_dir}")
+        installed_apps = create_scoop_wrapper().install(self.scoop_file)
         for app in installed_apps:
             self.install_dirs.extend(app.get_all_required_paths())
         self.execution_info.to_json_file(self.execution_info_file)
@@ -79,5 +83,5 @@ class ScoopInstall(PipelineStep):
         install_dirs = ScoopInstallExecutionInfo.from_json_file(self.execution_info_file).install_dirs
         # Make the list unique and keep the order
         unique_paths = list(dict.fromkeys(install_dirs))
-        # Update the install directories for the subsequent stages
+        # Update the install directories for the subsequent steps
         self.execution_context.add_install_dirs(unique_paths)

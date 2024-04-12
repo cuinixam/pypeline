@@ -22,7 +22,7 @@ class CreateVEnv(PipelineStep):
         return self.__class__.__name__
 
     def run(self) -> int:
-        self.logger.debug(f"Run {self.get_name()} stage. Output dir: {self.output_dir}")
+        self.logger.debug(f"Run {self.get_name()} step. Output dir: {self.output_dir}")
         build_script_path = self.project_root_dir / "bootstrap.py"
         if not build_script_path.exists():
             raise UserNotificationException("Failed to find bootstrap script. Make sure that the project is initialized correctly.")
