@@ -2,6 +2,13 @@
 
 
 
+## v0.1.1 (2024-04-12)
+
+### Fix
+
+* fix: pyyaml explicit dependency missing ([`5876cc3`](https://github.com/cuinixam/pypeline/commit/5876cc3af1e19f776dfc7460e20861149cf3ab7a))
+
+
 ## v0.1.0 (2024-04-12)
 
 ### Feature
