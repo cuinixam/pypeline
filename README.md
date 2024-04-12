@@ -4,8 +4,8 @@
   <a href="https://github.com/cuinixam/pypeline/actions/workflows/ci.yml?query=branch%3Amain">
     <img src="https://img.shields.io/github/actions/workflow/status/cuinixam/pypeline/ci.yml?branch=main&label=CI&logo=github&style=flat-square" alt="CI Status" >
   </a>
-  <a href="https://pypeline.readthedocs.io">
-    <img src="https://img.shields.io/readthedocs/pypeline.svg?logo=read-the-docs&logoColor=fff&style=flat-square" alt="Documentation Status">
+  <a href="https://pypeline-runner.readthedocs.io">
+    <img src="https://img.shields.io/readthedocs/pypeline-runner.svg?logo=read-the-docs&logoColor=fff&style=flat-square" alt="Documentation Status">
   </a>
   <a href="https://codecov.io/gh/cuinixam/pypeline">
     <img src="https://img.shields.io/codecov/c/github/cuinixam/pypeline.svg?logo=codecov&logoColor=fff&style=flat-square" alt="Test coverage percentage">
@@ -30,13 +30,13 @@
   <img src="https://img.shields.io/pypi/l/pypeline.svg?style=flat-square" alt="License">
 </p>
 
-Configure and execute steps for developing a python package.
+Configure and execute pipelines with Python (similar to GitHub workflows or Jenkins pipelines).
 
 ## Installation
 
 Install this via pip (or your favourite package manager):
 
-`pip install pypeline`
+`pip install pypeline-runner`
 
 ## Start developing
 

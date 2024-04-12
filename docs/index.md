@@ -20,7 +20,7 @@ title: Python Pipeline
 :columns: 8
 :class: sd-fs-3
 
-Configure and execute steps for developing a python package.
+Configure and execute pipelines with Python (similar to GitHub workflows or Jenkins pipelines).
 :::
 
 ::::

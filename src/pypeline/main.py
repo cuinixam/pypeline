@@ -13,7 +13,9 @@ from pypeline.pypeline import PipelineScheduler, PipelineStepsExecutor
 
 package_name = "pypeline"
 
-app = typer.Typer(name=package_name, help="Configure and execute steps for developing a python package.", no_args_is_help=True, add_completion=False)
+app = typer.Typer(
+    name=package_name, help="Configure and execute pipelines with Python (similar to GitHub workflows or Jenkins pipelines).", no_args_is_help=True, add_completion=False
+)
 
 
 @app.callback(invoke_without_command=True)
