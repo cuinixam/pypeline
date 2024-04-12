@@ -1,12 +1,12 @@
 [tool.poetry]
-name = "pypeline"
+name = "pypeline-runner"
 version = "0.0.0"
-description = "Configure and execute steps for developing a python package."
+description = "Configure and execute pipelines with Python (similar to GitHub workflows or Jenkins pipelines)."
 authors = ["cuinixam <me@cuinixam.com>"]
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/cuinixam/pypeline"
-documentation = "https://pypeline.readthedocs.io"
+documentation = "https://pypeline-runner.readthedocs.io"
 classifiers = [
     "Development Status :: 2 - Pre-Alpha",
     "Intended Audience :: Developers",
@@ -17,6 +17,9 @@ classifiers = [
 packages = [
     { include = "pypeline", from = "src" },
 ]
+
+[tool.poetry.scripts]
+pypeline = "pypeline.main:main"
 
 [tool.poetry.urls]
 "Bug Tracker" = "https://github.com/cuinixam/pypeline/issues"
@@ -49,7 +52,7 @@ version_variables = [
     "src/pypeline/__init__.py:__version__",
     "docs/conf.py:release",
 ]
-build_command = "poetry build"
+build_command = "pip install poetry && poetry build"
 
 [tool.semantic_release.changelog]
 exclude_commit_patterns = [
