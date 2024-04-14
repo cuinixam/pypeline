@@ -2,6 +2,23 @@
 
 
 
+## v0.2.0 (2024-04-14)
+
+### Documentation
+
+* docs: add how to kickstart a project with pypeline ([`cefe759`](https://github.com/cuinixam/pypeline/commit/cefe7591fb3393fe2e05ecafbf9105d873f90a90))
+
+### Feature
+
+* feat: add dry run option ([`e20cfa5`](https://github.com/cuinixam/pypeline/commit/e20cfa5e690c567d94103e838f49fb5a4f64bc5e))
+
+* feat: create venv bootstrap script path is configurable ([`cb1109b`](https://github.com/cuinixam/pypeline/commit/cb1109b79c81e5a9e2ef9e12050c1e38e4fc746f))
+
+### Fix
+
+* fix: scoop install not executed if scoop dirs file is deleted ([`c2fb9e3`](https://github.com/cuinixam/pypeline/commit/c2fb9e3ea05527a0a6802df61555a2e27a160656))
+
+
 ## v0.1.1 (2024-04-12)
 
 ### Fix

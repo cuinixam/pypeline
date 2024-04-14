@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pypeline-runner"
-version = "0.1.1"
+version = "0.2.0"
 description = "Configure and execute pipelines with Python (similar to GitHub workflows or Jenkins pipelines)."
 authors = ["cuinixam <me@cuinixam.com>"]
 license = "MIT"
