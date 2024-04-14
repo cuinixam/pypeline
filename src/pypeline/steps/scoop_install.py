@@ -77,7 +77,7 @@ class ScoopInstall(PipelineStep):
         return [self.scoop_file]
 
     def get_outputs(self) -> List[Path]:
-        return self.install_dirs
+        return [self.execution_info_file, *self.install_dirs]
 
     def update_execution_context(self) -> None:
         install_dirs = ScoopInstallExecutionInfo.from_json_file(self.execution_info_file).install_dirs
