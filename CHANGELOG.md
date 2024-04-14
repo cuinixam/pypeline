@@ -2,6 +2,13 @@
 
 
 
+## v0.2.1 (2024-04-14)
+
+### Fix
+
+* fix: invalid configuration exceptions not caught ([`0576a4b`](https://github.com/cuinixam/pypeline/commit/0576a4b976b588c5804c78df9cdf48bd0a9e066f))
+
+
 ## v0.2.0 (2024-04-14)
 
 ### Documentation
