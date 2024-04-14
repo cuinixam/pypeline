@@ -7,7 +7,7 @@ This guide will walk you through the process of installing Pypeline and kick-sta
 To install Pypeline, run the following command:
 
 ```bash
-pip install pypeline
+pip install pypeline-runner
 ```
 
 If you cloned the repository, follow the steps in the `README` to bootstrap the project and install the dependencies.
