@@ -60,10 +60,14 @@ def run(
         help="Force the execution of a step even if it is not dirty.",
         is_flag=True,
     ),
+    dry_run: bool = typer.Option(
+        False,
+        help="Do not run any step, just print the steps that would be executed.",
+        is_flag=True,
+    ),
 ) -> None:
     project_slurper = ProjectSlurper(project_dir)
     if print:
-        logger.warning("TODO: print pipeline steps")
         logger.info("Pipeline steps:")
         for group, step_configs in project_slurper.pipeline.items():
             logger.info(f"    Group: {group}")
@@ -80,11 +84,7 @@ def run(
         logger.info("No steps to run.")
         return
 
-    PipelineStepsExecutor(
-        project_slurper.artifacts_locator,
-        steps_references,
-        force_run,
-    ).run()
+    PipelineStepsExecutor(project_slurper.artifacts_locator, steps_references, force_run, dry_run).run()
 
 
 def main(args: Optional[List[str]] = None) -> int:

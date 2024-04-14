@@ -2,12 +2,14 @@ from pathlib import Path
 from typing import List, Type, cast
 
 import pytest
+from py_app_dev.core.exceptions import UserNotificationException
 from py_app_dev.core.pipeline import PipelineConfig
 
 from pypeline.domain.artifacts import ProjectArtifactsLocator
 from pypeline.domain.config import ProjectConfig
 from pypeline.domain.pipeline import PipelineStep, PipelineStepReference
 from pypeline.pypeline import PipelineLoader, PipelineScheduler, PipelineStepsExecutor
+from pypeline.steps.create_venv import CreateVEnv
 
 
 @pytest.fixture
@@ -59,3 +61,19 @@ def test_pipeline_executor(artifacts_locator: ProjectArtifactsLocator) -> None:
     executor = PipelineStepsExecutor(artifacts_locator, [PipelineStepReference("MyStep", cast(Type[PipelineStep], MyCustomPipelineStep))])
     executor.run()
     assert artifacts_locator.build_dir.joinpath("MyStep/MyCustomPipelineStep.deps.json").exists(), "Step dependencies file shall exist"
+
+
+def test_pipeline_executor_dry_run(artifacts_locator: ProjectArtifactsLocator) -> None:
+    executor = PipelineStepsExecutor(
+        artifacts_locator,
+        [
+            PipelineStepReference("venv", cast(Type[PipelineStep], CreateVEnv), {"bootstrap_script": "does_not_exist.py"}),
+        ],
+        dry_run=True,
+    )
+    executor.run()
+    assert not artifacts_locator.build_dir.joinpath("venv/CreateVEnvStep.deps.json").exists(), "Step dependencies file shall not exist"
+    # If the step is actually executed it fails because the bootstrap script does not exist
+    executor.dry_run = False
+    with pytest.raises(UserNotificationException):
+        executor.run()

@@ -37,11 +37,13 @@ class PipelineStepsExecutor:
         artifacts_locator: ProjectArtifactsLocator,
         steps_references: List[PipelineStepReference],
         force_run: bool = False,
+        dry_run: bool = False,
     ) -> None:
         self.logger = logger.bind()
         self.artifacts_locator = artifacts_locator
         self.steps_references = steps_references
         self.force_run = force_run
+        self.dry_run = dry_run
 
     def run(self) -> None:
         execution_context = ExecutionContext(project_root_dir=self.artifacts_locator.project_root_dir, install_dirs=[])
@@ -51,7 +53,7 @@ class PipelineStepsExecutor:
             step_output_dir.mkdir(parents=True, exist_ok=True)
             step = step_reference._class(execution_context, step_output_dir, step_reference.config)
             # Execute the step is necessary. If the step is not dirty, it will not be executed
-            Executor(step.output_dir, self.force_run).execute(step)
+            Executor(step.output_dir, self.force_run, self.dry_run).execute(step)
             # Independent if the step was executed or not, every step shall update the context
             step.update_execution_context()
 
