@@ -3,7 +3,7 @@ import json
 import traceback
 from dataclasses import dataclass
 from pathlib import Path
-from typing import ClassVar, List
+from typing import Any, ClassVar, Dict, List, Optional
 
 from mashumaro.config import TO_DICT_ADD_OMIT_NONE_FLAG, BaseConfig
 from mashumaro.mixins.json import DataClassJSONMixin
@@ -46,8 +46,8 @@ def create_scoop_wrapper() -> ScoopWrapper:
 
 
 class ScoopInstall(PipelineStep):
-    def __init__(self, execution_context: ExecutionContext, output_dir: Path) -> None:
-        super().__init__(execution_context, output_dir)
+    def __init__(self, execution_context: ExecutionContext, output_dir: Path, config: Optional[Dict[str, Any]] = None) -> None:
+        super().__init__(execution_context, output_dir, config)
         self.logger = logger.bind()
         self.execution_info = ScoopInstallExecutionInfo([])
         # One needs to keep track of the installed apps to get the required paths

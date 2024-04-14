@@ -1,6 +1,8 @@
+from dataclasses import dataclass
 from pathlib import Path
-from typing import List
+from typing import Any, Dict, List, Optional
 
+from mashumaro import DataClassDictMixin
 from py_app_dev.core.exceptions import UserNotificationException
 from py_app_dev.core.logging import logger
 
@@ -8,9 +10,14 @@ from ..domain.execution_context import ExecutionContext
 from ..domain.pipeline import PipelineStep
 
 
+@dataclass
+class CreateVEnvConfig(DataClassDictMixin):
+    bootstrap_script: str = "bootstrap.py"
+
+
 class CreateVEnv(PipelineStep):
-    def __init__(self, execution_context: ExecutionContext, output_dir: Path) -> None:
-        super().__init__(execution_context, output_dir)
+    def __init__(self, execution_context: ExecutionContext, output_dir: Path, config: Optional[Dict[str, Any]] = None) -> None:
+        super().__init__(execution_context, output_dir, config)
         self.logger = logger.bind()
         self.logger = logger.bind()
 
@@ -23,11 +30,12 @@ class CreateVEnv(PipelineStep):
 
     def run(self) -> int:
         self.logger.debug(f"Run {self.get_name()} step. Output dir: {self.output_dir}")
-        build_script_path = self.project_root_dir / "bootstrap.py"
-        if not build_script_path.exists():
+        config = CreateVEnvConfig.from_dict(self.config) if self.config else CreateVEnvConfig()
+        bootstrap_script = self.project_root_dir / config.bootstrap_script
+        if not bootstrap_script.exists():
             raise UserNotificationException("Failed to find bootstrap script. Make sure that the project is initialized correctly.")
         self.execution_context.create_process_executor(
-            ["python", build_script_path.as_posix()],
+            ["python", bootstrap_script.as_posix()],
             cwd=self.project_root_dir,
         ).execute()
         self.execution_context.add_install_dirs(self.install_dirs)

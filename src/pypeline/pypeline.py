@@ -26,7 +26,7 @@ class PipelineLoader:
         self._loader = GenericPipelineLoader[PipelineStep](self.pipeline_config, self.project_root_dir)
 
     def load_steps_references(self) -> List[PipelineStepReference]:
-        return [PipelineStepReference(step_reference.group_name, step_reference._class) for step_reference in self._loader.load_steps()]
+        return [PipelineStepReference(step_reference.group_name, step_reference._class, step_reference.config) for step_reference in self._loader.load_steps()]
 
 
 class PipelineStepsExecutor:
@@ -49,7 +49,7 @@ class PipelineStepsExecutor:
             step_output_dir = self.artifacts_locator.build_dir / step_reference.group_name
             # Create the step output directory, to make sure that files can be created.
             step_output_dir.mkdir(parents=True, exist_ok=True)
-            step = step_reference._class(execution_context, step_output_dir)
+            step = step_reference._class(execution_context, step_output_dir, step_reference.config)
             # Execute the step is necessary. If the step is not dirty, it will not be executed
             Executor(step.output_dir, self.force_run).execute(step)
             # Independent if the step was executed or not, every step shall update the context

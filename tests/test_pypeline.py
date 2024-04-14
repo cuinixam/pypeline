@@ -18,6 +18,8 @@ def pipeline_config(project: Path) -> PipelineConfig:
 def test_pipeline_loader(project: Path, pipeline_config: PipelineConfig) -> None:
     steps_references = PipelineLoader(pipeline_config, project).load_steps_references()
     assert [step_ref.name for step_ref in steps_references] == ["MyStep", "ScoopInstall"]
+    assert steps_references[0].config == {"input": "value"}
+    assert steps_references[1].config is None
 
 
 def test_pipeline_scheduler(project: Path, pipeline_config: PipelineConfig) -> None:

@@ -23,11 +23,11 @@
   </a>
 </p>
 <p align="center">
-  <a href="https://pypi.org/project/pypeline/">
-    <img src="https://img.shields.io/pypi/v/pypeline.svg?logo=python&logoColor=fff&style=flat-square" alt="PyPI Version">
+  <a href="https://pypi.org/project/pypeline-runner/">
+    <img src="https://img.shields.io/pypi/v/pypeline-runner.svg?logo=python&logoColor=fff&style=flat-square" alt="PyPI Version">
   </a>
-  <img src="https://img.shields.io/pypi/pyversions/pypeline.svg?style=flat-square&logo=python&amp;logoColor=fff" alt="Supported Python versions">
-  <img src="https://img.shields.io/pypi/l/pypeline.svg?style=flat-square" alt="License">
+  <img src="https://img.shields.io/pypi/pyversions/pypeline-runner.svg?style=flat-square&logo=python&amp;logoColor=fff" alt="Supported Python versions">
+  <img src="https://img.shields.io/pypi/l/pypeline-runner.svg?style=flat-square" alt="License">
 </p>
 
 Configure and execute pipelines with Python (similar to GitHub workflows or Jenkins pipelines).

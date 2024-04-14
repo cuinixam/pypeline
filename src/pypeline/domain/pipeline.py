@@ -1,6 +1,6 @@
 from abc import abstractmethod
 from pathlib import Path
-from typing import Type
+from typing import Any, Dict, Optional, Type
 
 from py_app_dev.core.runnable import Runnable
 
@@ -8,9 +8,10 @@ from .execution_context import ExecutionContext
 
 
 class PipelineStep(Runnable):
-    def __init__(self, execution_context: ExecutionContext, output_dir: Path) -> None:
+    def __init__(self, execution_context: ExecutionContext, output_dir: Path, config: Optional[Dict[str, Any]] = None) -> None:
         self.execution_context = execution_context
         self.output_dir = output_dir
+        self.config = config
         self.project_root_dir = self.execution_context.project_root_dir
 
     @abstractmethod
@@ -19,9 +20,10 @@ class PipelineStep(Runnable):
 
 
 class PipelineStepReference:
-    def __init__(self, group_name: str, _class: Type[PipelineStep]) -> None:
+    def __init__(self, group_name: str, _class: Type[PipelineStep], config: Optional[Dict[str, Any]] = None) -> None:
         self.group_name = group_name
         self._class = _class
+        self.config = config
 
     @property
     def name(self) -> str:

@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List
+from typing import Any, Dict, List, Optional
 
 from py_app_dev.core.exceptions import UserNotificationException
 from py_app_dev.core.logging import logger
@@ -9,8 +9,8 @@ from ..domain.pipeline import PipelineStep
 
 
 class WestInstall(PipelineStep):
-    def __init__(self, execution_context: ExecutionContext, output_dir: Path) -> None:
-        super().__init__(execution_context, output_dir)
+    def __init__(self, execution_context: ExecutionContext, output_dir: Path, config: Optional[Dict[str, Any]] = None) -> None:
+        super().__init__(execution_context, output_dir, config)
         self.logger = logger.bind()
         self.artifacts_locator = execution_context.create_artifacts_locator()
 

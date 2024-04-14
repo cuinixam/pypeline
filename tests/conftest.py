@@ -39,6 +39,8 @@ def project(tmp_path: Path) -> Path:
                 custom:
                     - step: MyStep
                       file: my_python_file.py
+                      config:
+                            input: value
                 install:
                     - step: ScoopInstall
                       module: pypeline.steps.scoop_install
