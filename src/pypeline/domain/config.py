@@ -20,7 +20,10 @@ class ProjectConfig(DataClassDictMixin):
     @classmethod
     def from_file(cls, config_file: Path) -> "ProjectConfig":
         config_dict = cls.parse_to_dict(config_file)
-        return cls.from_dict(config_dict)
+        try:
+            return cls.from_dict(config_dict)
+        except Exception as e:
+            raise UserNotificationException(f"Invalid configuration file '{config_file}'. \nError: {e}") from None
 
     @staticmethod
     def parse_to_dict(config_file: Path) -> Dict[str, Any]:
@@ -31,6 +34,6 @@ class ProjectConfig(DataClassDictMixin):
                 config_dict["file"] = config_file
             return config_dict
         except ScannerError as e:
-            raise UserNotificationException(f"Failed scanning configuration file '{config_file}'. \nError: {e}") from e
+            raise UserNotificationException(f"Failed scanning configuration file '{config_file}'. \nError: {e}") from None
         except ParserError as e:
-            raise UserNotificationException(f"Failed parsing configuration file '{config_file}'. \nError: {e}") from e
+            raise UserNotificationException(f"Failed parsing configuration file '{config_file}'. \nError: {e}") from None

@@ -1,6 +1,6 @@
 import sys
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 import typer
 from py_app_dev.core.exceptions import UserNotificationException
@@ -86,17 +86,10 @@ def run(
     PipelineStepsExecutor(project_slurper.artifacts_locator, steps_references, force_run, dry_run).run()
 
 
-def main(args: Optional[List[str]] = None) -> int:
+if __name__ == "__main__":
     try:
         setup_logger()
-        if args is None:
-            args = sys.argv[1:]
-        app(args)
-        return 0
+        app()
     except UserNotificationException as e:
         logger.error(f"{e}")
-        return 1
-
-
-if __name__ == "__main__":
-    sys.exit(main())
+        sys.exit(1)

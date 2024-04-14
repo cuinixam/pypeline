@@ -6,7 +6,7 @@ from py_app_dev.core.exceptions import UserNotificationException
 from typer.testing import CliRunner
 
 from pypeline.domain.artifacts import ProjectArtifactsLocator
-from pypeline.main import app
+from pypeline.main import __version__, app
 
 runner = CliRunner()
 
@@ -25,6 +25,21 @@ def test_run(artifacts_locator: ProjectArtifactsLocator) -> None:
     )
     assert result.exit_code == 0
     assert artifacts_locator.build_dir.joinpath("custom/MyStep.deps.json").exists(), "Step dependencies file shall exist"
+
+    result = runner.invoke(
+        app,
+        ["run", "--project-dir", artifacts_locator.project_root_dir.as_posix(), "--print"],
+    )
+    assert result.exit_code == 0
+
+
+def test_run_no_step(artifacts_locator: ProjectArtifactsLocator) -> None:
+    result = runner.invoke(
+        app,
+        ["run", "--project-dir", artifacts_locator.project_root_dir.as_posix(), "--step", "NonExistentStep", "--single"],
+    )
+    assert result.exit_code == 1
+    assert isinstance(result.exception, UserNotificationException)
 
 
 def test_run_no_pypeline_config(tmp_path: Path) -> None:
@@ -62,3 +77,12 @@ def test_init_with_force_in_non_empty_directory(project: Path, kickstart_files: 
 
     for file in kickstart_files:
         assert project.joinpath(file).exists(), f"{file} shall exist"
+
+
+def test_help() -> None:
+    result = runner.invoke(app, ["--help"])
+    assert result.exit_code == 0
+
+    result = runner.invoke(app, ["--version"])
+    assert result.exit_code == 0
+    assert f"pypeline {__version__}" in result.output
