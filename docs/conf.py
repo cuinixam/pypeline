@@ -80,7 +80,7 @@ extensions.append("sphinx_copybutton")
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
 html_theme = "sphinx_book_theme"
-html_logo = "_static/python-logo-only.svg"
+html_logo = "_static/pypeline_small.png"
 html_theme_options = {
     "home_page_in_toc": True,
     "github_url": "https://github.com/cuinixam/hello-python",

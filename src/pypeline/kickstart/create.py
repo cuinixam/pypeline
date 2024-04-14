@@ -31,7 +31,7 @@ class ProjectBuilder:
     @staticmethod
     def _check_target_directory(project_dir: Path) -> None:
         if project_dir.is_dir() and any(project_dir.iterdir()):
-            raise UserNotificationException(f"Project directory '{project_dir}' is not empty." " The target directory shall either be empty or not exist.")
+            raise UserNotificationException(f"Project directory '{project_dir}' is not empty. Use --force to override.")
 
     def build(self) -> None:
         if self.check_target_directory_flag:

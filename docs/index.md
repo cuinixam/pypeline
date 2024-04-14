@@ -1,29 +1,10 @@
----
-title: Python Pipeline
----
+:::{card} 📦 Pypeline
 
-::::{grid}
-:reverse:
-:gutter: 2 1 1 1
-:margin: 4 4 1 1
+```{include} intro.md
 
-:::{grid-item}
-:columns: 4
-
-```{image} ./_static/python-logo-only.svg
-:width: 150px
 ```
 
 :::
-
-:::{grid-item}
-:columns: 8
-:class: sd-fs-3
-
-Configure and execute pipelines with Python (similar to GitHub workflows or Jenkins pipelines).
-:::
-
-::::
 
 ---
 
