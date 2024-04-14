@@ -31,10 +31,9 @@ def version(
 @time_it("init")
 def init(
     project_dir: Path = typer.Option(Path.cwd().absolute(), help="The project directory"),  # noqa: B008
-    bootstrap_only: bool = typer.Option(False, help="Initialize only the bootstrap files."),
     force: bool = typer.Option(False, help="Force the initialization of the project even if the directory is not empty."),
 ) -> None:
-    KickstartProject(project_dir, bootstrap_only, force).run()
+    KickstartProject(project_dir, force).run()
 
 
 @app.command()

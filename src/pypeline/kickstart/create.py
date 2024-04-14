@@ -41,18 +41,16 @@ class ProjectBuilder:
 
 
 class KickstartProject:
-    def __init__(self, project_dir: Path, bootstrap_only: bool = False, force: bool = False) -> None:
+    def __init__(self, project_dir: Path, force: bool = False) -> None:
         self.logger = logger.bind()
         self.project_dir = project_dir
-        self.bootstrap_only = bootstrap_only
         self.force = force
 
     def run(self) -> None:
         self.logger.info(f"Kickstart new project in '{self.project_dir.absolute().as_posix()}'")
         project_builder = ProjectBuilder(self.project_dir)
-        project_builder.with_dir("bootstrap")
-        if self.bootstrap_only or self.force:
+        if self.force:
             project_builder.with_disable_target_directory_check()
-        if not self.bootstrap_only:
-            project_builder.with_dir("project")
+        project_builder.with_dir("bootstrap")
+        project_builder.with_dir("project")
         project_builder.build()
