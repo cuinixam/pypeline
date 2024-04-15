@@ -86,10 +86,14 @@ def run(
     PipelineStepsExecutor(project_slurper.artifacts_locator, steps_references, force_run, dry_run).run()
 
 
-if __name__ == "__main__":
+def main() -> None:
     try:
         setup_logger()
         app()
     except UserNotificationException as e:
         logger.error(f"{e}")
         sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
