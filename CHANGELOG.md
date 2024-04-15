@@ -2,6 +2,13 @@
 
 
 
+## v0.2.2 (2024-04-15)
+
+### Fix
+
+* fix: pypeline.exe script not working ([`7797683`](https://github.com/cuinixam/pypeline/commit/77976836e2afd94793cbe9bc93a4950319242795))
+
+
 ## v0.2.1 (2024-04-14)
 
 ### Fix
