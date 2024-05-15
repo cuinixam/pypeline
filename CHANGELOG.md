@@ -2,6 +2,17 @@
 
 
 
+## v0.3.0 (2024-05-15)
+
+### Documentation
+
+* docs: pypeline.yaml configuration ([`40d7b15`](https://github.com/cuinixam/pypeline/commit/40d7b1551adc8a6e0429669f72076ad25f4eb881))
+
+### Feature
+
+* feat: add support for running commands ([`7f56565`](https://github.com/cuinixam/pypeline/commit/7f56565dcfa21e4d5f660cef5ac8a00fe02d8f9a))
+
+
 ## v0.2.2 (2024-04-15)
 
 ### Fix
