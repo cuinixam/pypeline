@@ -5,9 +5,10 @@ from typing import Any, Dict, Optional
 import yaml
 from mashumaro import DataClassDictMixin
 from py_app_dev.core.exceptions import UserNotificationException
-from py_app_dev.core.pipeline import PipelineConfig
 from yaml.parser import ParserError
 from yaml.scanner import ScannerError
+
+from .pipeline import PipelineConfig
 
 
 @dataclass

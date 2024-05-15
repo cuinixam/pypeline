@@ -15,6 +15,9 @@ pipeline:
   install:
     - step: ScoopInstall
       module: pypeline.steps.scoop_install
+    - step: print_env
+      description: print the env
+      run: set
   build:
     - step: MyBuildStep
       file: steps/build_step.py
@@ -27,8 +30,46 @@ These are the building blocks of the pipeline. Each step is a Python class that 
 - `step` - Step class name (alias for `class_name`)
 - `module` - Python module with step class
 - `file` - Path to file with step class. The path should be relative to the project root directory.
+- `run` - Command to run. For simple steps that don't need a class
 - `class_name` - Step class name
 - `config` - The user can provide configuration options for each step. See the step specific documentation for available options.
+
+### Step Types
+
+Steps can be either Python classes or simple commands. The user can choose the appropriate method based on the complexity of the task.
+
+For complex tasks that require dependency management or must provide user configuration options, one shall create steps as Python classes.
+These classes should inherit from the `PipelineStep` class. One can either refer to a class in a Python module or provide the class definition in a file.
+
+Examples:
+
+```{code-block} yaml
+:caption: Example step from a Python module
+pipeline:
+  group:
+    - step: MyStep
+      module: my_module.steps
+```
+
+```{code-block} yaml
+:caption: Example step from a file in the project
+pipeline:
+  group:
+    - step: MyStep
+      file: steps/my_step.py
+```
+
+For simple tasks that can be executed using a single command, one can use the `run` option to define the command to be executed.
+For such a step there is no dependency management and no user configuration. These steps are always executed.
+
+```{code-block} yaml
+:caption: Example step with a command
+pipeline:
+  group:
+    - step: print_env
+      description: print the environment
+      run: set
+```
 
 ### Groups
 

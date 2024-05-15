@@ -1,15 +1,17 @@
+import textwrap
 from pathlib import Path
 from typing import List, Type, cast
+from unittest.mock import Mock
 
 import pytest
 from py_app_dev.core.exceptions import UserNotificationException
-from py_app_dev.core.pipeline import PipelineConfig
 
 from pypeline.domain.artifacts import ProjectArtifactsLocator
 from pypeline.domain.config import ProjectConfig
-from pypeline.domain.pipeline import PipelineStep, PipelineStepReference
+from pypeline.domain.pipeline import PipelineConfig, PipelineStep, PipelineStepReference
 from pypeline.pypeline import PipelineLoader, PipelineScheduler, PipelineStepsExecutor
 from pypeline.steps.create_venv import CreateVEnv
+from tests.utils import assert_element_of_type
 
 
 @pytest.fixture
@@ -22,6 +24,38 @@ def test_pipeline_loader(project: Path, pipeline_config: PipelineConfig) -> None
     assert [step_ref.name for step_ref in steps_references] == ["MyStep", "ScoopInstall"]
     assert steps_references[0].config == {"input": "value"}
     assert steps_references[1].config is None
+
+
+def test_pipeline_loader_run_command_step(tmp_path: Path) -> None:
+    config_file = tmp_path / "pypeline.yaml"
+    config_file.write_text(
+        textwrap.dedent("""\
+    pipeline:
+        steps:
+            - step: Echo
+              run: echo 'Hello'
+              description: Simple step that runs a command
+    """)
+    )
+    steps_references = PipelineLoader(
+        ProjectConfig.from_file(config_file).pipeline,
+        tmp_path,
+    ).load_steps_references()
+    step_ref = assert_element_of_type(steps_references, PipelineStepReference)
+    assert step_ref.name == "DynamicRunCommandStep"
+    step = step_ref._class(Mock(), Mock())
+    assert step.get_name() == "Echo"
+
+
+def test_pipeline_create_run_command_step_class(artifacts_locator: ProjectArtifactsLocator) -> None:
+    executor = PipelineStepsExecutor(
+        artifacts_locator,
+        [
+            PipelineStepReference("my_cmd", cast(Type[PipelineStep], PipelineLoader._create_run_command_step_class("echo 'Hello'", "Echo"))),
+        ],
+    )
+    executor.run()
+    assert not len(list(artifacts_locator.build_dir.glob("my_cmd/*.deps.json"))), "Step dependencies file shall not exist"
 
 
 def test_pipeline_scheduler(project: Path, pipeline_config: PipelineConfig) -> None:

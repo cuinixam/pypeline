@@ -1,14 +1,21 @@
+import importlib
+from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
-from typing import List, Optional
+from typing import (
+    Any,
+    Dict,
+    List,
+    Optional,
+    Type,
+)
 
+from py_app_dev.core.exceptions import UserNotificationException
 from py_app_dev.core.logging import logger
-from py_app_dev.core.pipeline import PipelineConfig
-from py_app_dev.core.pipeline import PipelineLoader as GenericPipelineLoader
 from py_app_dev.core.runnable import Executor
 
 from .domain.artifacts import ProjectArtifactsLocator
 from .domain.execution_context import ExecutionContext
-from .domain.pipeline import PipelineStep, PipelineStepReference
+from .domain.pipeline import PipelineConfig, PipelineStep, PipelineStepConfig, PipelineStepReference
 
 
 class PipelineLoader:
@@ -23,10 +30,95 @@ class PipelineLoader:
     def __init__(self, pipeline_config: PipelineConfig, project_root_dir: Path) -> None:
         self.pipeline_config = pipeline_config
         self.project_root_dir = project_root_dir
-        self._loader = GenericPipelineLoader[PipelineStep](self.pipeline_config, self.project_root_dir)
 
     def load_steps_references(self) -> List[PipelineStepReference]:
-        return [PipelineStepReference(step_reference.group_name, step_reference._class, step_reference.config) for step_reference in self._loader.load_steps()]
+        result = []
+        for group_name, steps_config in self.pipeline_config.items():
+            result.extend(self._load_steps(group_name, steps_config, self.project_root_dir))
+        return result
+
+    @staticmethod
+    def _load_steps(
+        group_name: str,
+        steps_config: List[PipelineStepConfig],
+        project_root_dir: Path,
+    ) -> List[PipelineStepReference]:
+        result = []
+        for step_config in steps_config:
+            step_class_name = step_config.class_name or step_config.step
+            if step_config.module:
+                step_class = PipelineLoader._load_module_step(step_config.module, step_class_name)
+            elif step_config.file:
+                step_class = PipelineLoader._load_user_step(project_root_dir.joinpath(step_config.file), step_class_name)
+            elif step_config.run:
+                step_class = PipelineLoader._create_run_command_step_class(step_config.run, step_class_name)
+            else:
+                raise UserNotificationException(f"Step '{step_class_name}' has no 'module' nor 'file' nor `run` defined." " Please check your pipeline configuration.")
+            result.append(PipelineStepReference(group_name, step_class, step_config.config))
+        return result
+
+    @staticmethod
+    def _load_user_step(python_file: Path, step_class_name: str) -> Type[PipelineStep]:
+        # Create a module specification from the file path
+        spec = spec_from_file_location(f"user__{step_class_name}", python_file)
+        if spec and spec.loader:
+            step_module = module_from_spec(spec)
+            # Import the module
+            spec.loader.exec_module(step_module)
+            try:
+                step_class = getattr(step_module, step_class_name)
+            except AttributeError:
+                raise UserNotificationException(f"Could not load class '{step_class_name}' from file '{python_file}'." " Please check your pipeline configuration.") from None
+            return step_class
+        raise UserNotificationException(f"Could not load file '{python_file}'." " Please check the file for any errors.")
+
+    @staticmethod
+    def _load_module_step(module_name: str, step_class_name: str) -> Type[PipelineStep]:
+        try:
+            module = importlib.import_module(module_name)
+            step_class = getattr(module, step_class_name)
+        except ImportError:
+            raise UserNotificationException(f"Could not load module '{module_name}'. Please check your pipeline configuration.") from None
+        except AttributeError:
+            raise UserNotificationException(f"Could not load class '{step_class_name}' from module '{module_name}'." " Please check your pipeline configuration.") from None
+        return step_class
+
+    @staticmethod
+    def _create_run_command_step_class(command: str, name: str) -> Type[PipelineStep]:
+        """Dynamically creates a step class for a given command."""
+
+        class DynamicRunCommandStep(PipelineStep):
+            """A simple step that runs a command."""
+
+            def __init__(self, execution_context: ExecutionContext, output_dir: Path, config: Optional[Dict[str, Any]] = None) -> None:
+                super().__init__(execution_context, output_dir, config)
+                self.command = command
+                self.name = name
+
+            def get_needs_dependency_management(self) -> bool:
+                """A command step does not need dependency management."""
+                return False
+
+            def run(self) -> int:
+                self.execution_context.create_process_executor(
+                    [self.command],
+                    cwd=self.project_root_dir,
+                ).execute()
+                return 0
+
+            def get_name(self) -> str:
+                return self.name
+
+            def get_inputs(self) -> List[Path]:
+                return []
+
+            def get_outputs(self) -> List[Path]:
+                return []
+
+            def update_execution_context(self) -> None:
+                pass
+
+        return DynamicRunCommandStep
 
 
 class PipelineStepsExecutor:
