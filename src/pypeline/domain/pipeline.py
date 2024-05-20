@@ -52,6 +52,9 @@ class PipelineStep(Runnable):
     def update_execution_context(self) -> None:
         pass
 
+    def get_name(self) -> str:
+        return self.__class__.__name__
+
     def get_needs_dependency_management(self) -> bool:
         return True
 
