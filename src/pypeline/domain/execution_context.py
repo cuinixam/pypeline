@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 from py_app_dev.core.subprocess import SubprocessExecutor
 
 from .artifacts import ProjectArtifactsLocator
+from .build_trigger import BuildTrigger
 
 
 @dataclass
@@ -15,6 +16,8 @@ class ExecutionContext:
     install_dirs: List[Path] = field(default_factory=list)
     # Keep track of the environment variables, updated by any step for the subsequent steps
     env_vars: Dict[str, Any] = field(default_factory=dict)
+    # Build trigger information
+    build_trigger: Optional[BuildTrigger] = None
 
     def add_install_dirs(self, install_dirs: List[Path]) -> None:
         self.install_dirs.extend(install_dirs)

@@ -68,3 +68,18 @@ class PipelineStepReference:
     @property
     def name(self) -> str:
         return self._class.__name__
+
+
+class PipelineStepThatOnlyUpdatesTheExecutionContext(PipelineStep):
+    def get_needs_dependency_management(self) -> bool:
+        return False
+
+    def run(self) -> int:
+        """No need to run anything."""
+        return 0
+
+    def get_inputs(self) -> List[Path]:
+        return []
+
+    def get_outputs(self) -> List[Path]:
+        return []

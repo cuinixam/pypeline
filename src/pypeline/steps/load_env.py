@@ -1,13 +1,13 @@
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from py_app_dev.core.logging import logger
 
 from ..domain.execution_context import ExecutionContext
-from ..domain.pipeline import PipelineStep
+from ..domain.pipeline import PipelineStepThatOnlyUpdatesTheExecutionContext
 
 
-class LoadEnv(PipelineStep):
+class LoadEnv(PipelineStepThatOnlyUpdatesTheExecutionContext):
     """Load the environment variables from the .env file."""
 
     def __init__(self, execution_context: ExecutionContext, output_dir: Path, config: Optional[Dict[str, Any]] = None) -> None:
@@ -15,20 +15,6 @@ class LoadEnv(PipelineStep):
         self.logger = logger.bind()
         self.artifacts_locator = execution_context.create_artifacts_locator()
         self.execution_context = execution_context
-
-    def get_needs_dependency_management(self) -> bool:
-        """No need to manage dependencies. The .env file is always read."""
-        return False
-
-    def run(self) -> int:
-        """No need to run anything, the environment variables are loaded by update_execution_context."""
-        return 0
-
-    def get_inputs(self) -> List[Path]:
-        return []
-
-    def get_outputs(self) -> List[Path]:
-        return []
 
     def update_execution_context(self) -> None:
         """Load the environment variables from the .env file if exists."""
