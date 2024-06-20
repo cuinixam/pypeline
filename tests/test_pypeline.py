@@ -21,7 +21,7 @@ def pipeline_config(project: Path) -> PipelineConfig:
 
 def test_pipeline_loader(project: Path, pipeline_config: PipelineConfig) -> None:
     steps_references = PipelineLoader(pipeline_config, project).load_steps_references()
-    assert [step_ref.name for step_ref in steps_references] == ["MyStep", "ScoopInstall"]
+    assert [step_ref.name for step_ref in steps_references] == ["MyStep", "ScoopInstall", "Echo"]
     assert steps_references[0].config == {"input": "value"}
     assert steps_references[1].config is None
 
@@ -42,7 +42,7 @@ def test_pipeline_loader_run_command_step(tmp_path: Path) -> None:
         tmp_path,
     ).load_steps_references()
     step_ref = assert_element_of_type(steps_references, PipelineStepReference)
-    assert step_ref.name == "DynamicRunCommandStep"
+    assert step_ref.name == "Echo"
     step = step_ref._class(Mock(), Mock())
     assert step.get_name() == "Echo"
 
@@ -62,13 +62,16 @@ def test_pipeline_scheduler(project: Path, pipeline_config: PipelineConfig) -> N
     scheduler = PipelineScheduler(pipeline_config, project)
     # All steps shall be scheduled
     steps_references = scheduler.get_steps_to_run()
-    assert [step_ref.name for step_ref in steps_references] == ["MyStep", "ScoopInstall"]
+    assert [step_ref.name for step_ref in steps_references] == ["MyStep", "ScoopInstall", "Echo"]
     # Only the step with the provided name shall be scheduled
     steps_references = scheduler.get_steps_to_run(step_name="MyStep")
     assert [step_ref.name for step_ref in steps_references] == ["MyStep"]
     # Single step execution
     steps_references = scheduler.get_steps_to_run(step_name="ScoopInstall", single=True)
     assert [step_ref.name for step_ref in steps_references] == ["ScoopInstall"]
+    # Single execution for step with a command
+    steps_references = scheduler.get_steps_to_run(step_name="Echo", single=True)
+    assert [step_ref.name for step_ref in steps_references] == ["Echo"]
     # No steps are scheduled
     steps_references = scheduler.get_steps_to_run(step_name="MissingStep", single=True)
     assert [step_ref.name for step_ref in steps_references] == []

@@ -87,7 +87,7 @@ class PipelineLoader:
     def _create_run_command_step_class(command: str, name: str) -> Type[PipelineStep]:
         """Dynamically creates a step class for a given command."""
 
-        class DynamicRunCommandStep(PipelineStep):
+        class TmpDynamicRunCommandStep(PipelineStep):
             """A simple step that runs a command."""
 
             def __init__(self, execution_context: ExecutionContext, output_dir: Path, config: Optional[Dict[str, Any]] = None) -> None:
@@ -118,7 +118,8 @@ class PipelineLoader:
             def update_execution_context(self) -> None:
                 pass
 
-        return DynamicRunCommandStep
+        # Dynamically create the class with the given name
+        return type(name, (TmpDynamicRunCommandStep,), {})
 
 
 class PipelineStepsExecutor:

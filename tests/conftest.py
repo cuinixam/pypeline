@@ -44,6 +44,9 @@ def project(tmp_path: Path) -> Path:
                 install:
                     - step: ScoopInstall
                       module: pypeline.steps.scoop_install
+                    - step: Echo
+                      run: echo 'Hello'
+                      description: Simple step that runs a command
             """
         )
     )
