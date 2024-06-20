@@ -2,6 +2,13 @@
 
 
 
+## v0.3.1 (2024-06-20)
+
+### Fix
+
+* fix: steps with command are not found ([`1af9fc3`](https://github.com/cuinixam/pypeline/commit/1af9fc3a36b6b19abea793d9d7d68e64d357bbbf))
+
+
 ## v0.3.0 (2024-05-15)
 
 ### Documentation
