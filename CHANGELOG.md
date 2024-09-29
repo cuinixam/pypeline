@@ -2,6 +2,13 @@
 
 
 
+## v1.0.0 (2024-09-29)
+
+### Breaking
+
+* feat!: support custom execution context ([`0514d64`](https://github.com/cuinixam/pypeline/commit/0514d64e8f255758dc18152e6177f9f902450354))
+
+
 ## v0.3.1 (2024-06-20)
 
 ### Fix
