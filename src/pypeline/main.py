@@ -7,6 +7,7 @@ from py_app_dev.core.exceptions import UserNotificationException
 from py_app_dev.core.logging import logger, setup_logger, time_it
 
 from pypeline import __version__
+from pypeline.domain.execution_context import ExecutionContext
 from pypeline.domain.project_slurper import ProjectSlurper
 from pypeline.kickstart.create import KickstartProject
 from pypeline.pypeline import PipelineScheduler, PipelineStepsExecutor
@@ -76,14 +77,14 @@ def run(
     if not project_slurper.pipeline:
         raise UserNotificationException("No pipeline found in the configuration.")
     # Schedule the steps to run
-    steps_references = PipelineScheduler(project_slurper.pipeline, project_dir).get_steps_to_run(step, single)
+    steps_references = PipelineScheduler[ExecutionContext](project_slurper.pipeline, project_dir).get_steps_to_run(step, single)
     if not steps_references:
         if step:
             raise UserNotificationException(f"Step '{step}' not found in the pipeline.")
         logger.info("No steps to run.")
         return
 
-    PipelineStepsExecutor(project_slurper.artifacts_locator, steps_references, force_run, dry_run).run()
+    PipelineStepsExecutor[ExecutionContext](ExecutionContext(project_dir), steps_references, force_run, dry_run).run()
 
 
 def main() -> None:

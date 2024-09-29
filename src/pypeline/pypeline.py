@@ -4,9 +4,11 @@ from pathlib import Path
 from typing import (
     Any,
     Dict,
+    Generic,
     List,
     Optional,
     Type,
+    cast,
 )
 
 from py_app_dev.core.exceptions import UserNotificationException
@@ -15,10 +17,10 @@ from py_app_dev.core.runnable import Executor
 
 from .domain.artifacts import ProjectArtifactsLocator
 from .domain.execution_context import ExecutionContext
-from .domain.pipeline import PipelineConfig, PipelineStep, PipelineStepConfig, PipelineStepReference
+from .domain.pipeline import PipelineConfig, PipelineStep, PipelineStepConfig, PipelineStepReference, TExecutionContext
 
 
-class PipelineLoader:
+class PipelineLoader(Generic[TExecutionContext]):
     """
     Loads pipeline steps from a pipeline configuration.
 
@@ -31,7 +33,7 @@ class PipelineLoader:
         self.pipeline_config = pipeline_config
         self.project_root_dir = project_root_dir
 
-    def load_steps_references(self) -> List[PipelineStepReference]:
+    def load_steps_references(self) -> List[PipelineStepReference[TExecutionContext]]:
         result = []
         for group_name, steps_config in self.pipeline_config.items():
             result.extend(self._load_steps(group_name, steps_config, self.project_root_dir))
@@ -42,7 +44,7 @@ class PipelineLoader:
         group_name: str,
         steps_config: List[PipelineStepConfig],
         project_root_dir: Path,
-    ) -> List[PipelineStepReference]:
+    ) -> List[PipelineStepReference[TExecutionContext]]:
         result = []
         for step_config in steps_config:
             step_class_name = step_config.class_name or step_config.step
@@ -54,11 +56,11 @@ class PipelineLoader:
                 step_class = PipelineLoader._create_run_command_step_class(step_config.run, step_class_name)
             else:
                 raise UserNotificationException(f"Step '{step_class_name}' has no 'module' nor 'file' nor `run` defined." " Please check your pipeline configuration.")
-            result.append(PipelineStepReference(group_name, step_class, step_config.config))
+            result.append(PipelineStepReference[TExecutionContext](group_name, cast(Type[PipelineStep[TExecutionContext]], step_class), step_config.config))
         return result
 
     @staticmethod
-    def _load_user_step(python_file: Path, step_class_name: str) -> Type[PipelineStep]:
+    def _load_user_step(python_file: Path, step_class_name: str) -> Type[PipelineStep[ExecutionContext]]:
         # Create a module specification from the file path
         spec = spec_from_file_location(f"user__{step_class_name}", python_file)
         if spec and spec.loader:
@@ -73,7 +75,7 @@ class PipelineLoader:
         raise UserNotificationException(f"Could not load file '{python_file}'." " Please check the file for any errors.")
 
     @staticmethod
-    def _load_module_step(module_name: str, step_class_name: str) -> Type[PipelineStep]:
+    def _load_module_step(module_name: str, step_class_name: str) -> Type[PipelineStep[ExecutionContext]]:
         try:
             module = importlib.import_module(module_name)
             step_class = getattr(module, step_class_name)
@@ -84,14 +86,14 @@ class PipelineLoader:
         return step_class
 
     @staticmethod
-    def _create_run_command_step_class(command: str, name: str) -> Type[PipelineStep]:
+    def _create_run_command_step_class(command: str, name: str) -> Type[PipelineStep[ExecutionContext]]:
         """Dynamically creates a step class for a given command."""
 
-        class TmpDynamicRunCommandStep(PipelineStep):
+        class TmpDynamicRunCommandStep(PipelineStep[ExecutionContext]):
             """A simple step that runs a command."""
 
-            def __init__(self, execution_context: ExecutionContext, output_dir: Path, config: Optional[Dict[str, Any]] = None) -> None:
-                super().__init__(execution_context, output_dir, config)
+            def __init__(self, execution_context: ExecutionContext, group_name: str, config: Optional[Dict[str, Any]] = None) -> None:
+                super().__init__(execution_context, group_name, config)
                 self.command = command
                 self.name = name
 
@@ -122,29 +124,31 @@ class PipelineLoader:
         return type(name, (TmpDynamicRunCommandStep,), {})
 
 
-class PipelineStepsExecutor:
+class PipelineStepsExecutor(Generic[TExecutionContext]):
     """Executes a list of pipeline steps sequentially."""
 
     def __init__(
         self,
-        artifacts_locator: ProjectArtifactsLocator,
-        steps_references: List[PipelineStepReference],
+        execution_context: TExecutionContext,
+        steps_references: List[PipelineStepReference[TExecutionContext]],
         force_run: bool = False,
         dry_run: bool = False,
     ) -> None:
         self.logger = logger.bind()
-        self.artifacts_locator = artifacts_locator
+        self.execution_context = execution_context
         self.steps_references = steps_references
         self.force_run = force_run
         self.dry_run = dry_run
 
+    @property
+    def artifacts_locator(self) -> ProjectArtifactsLocator:
+        return self.execution_context.create_artifacts_locator()
+
     def run(self) -> None:
-        execution_context = ExecutionContext(project_root_dir=self.artifacts_locator.project_root_dir, install_dirs=[])
         for step_reference in self.steps_references:
-            step_output_dir = self.artifacts_locator.build_dir / step_reference.group_name
+            step = step_reference._class(self.execution_context, step_reference.group_name, step_reference.config)
             # Create the step output directory, to make sure that files can be created.
-            step_output_dir.mkdir(parents=True, exist_ok=True)
-            step = step_reference._class(execution_context, step_output_dir, step_reference.config)
+            step.output_dir.mkdir(parents=True, exist_ok=True)
             # Execute the step is necessary. If the step is not dirty, it will not be executed
             Executor(step.output_dir, self.force_run, self.dry_run).execute(step)
             # Independent if the step was executed or not, every step shall update the context
@@ -153,7 +157,7 @@ class PipelineStepsExecutor:
         return
 
 
-class PipelineScheduler:
+class PipelineScheduler(Generic[TExecutionContext]):
     """
     Schedules which steps must be executed based on the provided configuration.
 
@@ -168,16 +172,16 @@ class PipelineScheduler:
         self.project_root_dir = project_root_dir
         self.logger = logger.bind()
 
-    def get_steps_to_run(self, step_name: Optional[str] = None, single: bool = False) -> List[PipelineStepReference]:
-        pipeline_loader = PipelineLoader(self.pipeline, self.project_root_dir)
+    def get_steps_to_run(self, step_name: Optional[str] = None, single: bool = False) -> List[PipelineStepReference[TExecutionContext]]:
+        pipeline_loader = PipelineLoader[TExecutionContext](self.pipeline, self.project_root_dir)
         return self.filter_steps_references(pipeline_loader.load_steps_references(), step_name, single)
 
     @staticmethod
     def filter_steps_references(
-        steps_references: List[PipelineStepReference],
+        steps_references: List[PipelineStepReference[TExecutionContext]],
         step_name: Optional[str],
         single: Optional[bool],
-    ) -> List[PipelineStepReference]:
+    ) -> List[PipelineStepReference[TExecutionContext]]:
         if step_name:
             step_reference = next((step for step in steps_references if step.name == step_name), None)
             if not step_reference:

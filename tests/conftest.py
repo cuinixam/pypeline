@@ -16,8 +16,9 @@ def project(tmp_path: Path) -> Path:
             """\
             from typing import List
             from pathlib import Path
+            from pypeline.domain.execution_context import ExecutionContext
             from pypeline.domain.pipeline import PipelineStep
-            class MyStep(PipelineStep):
+            class MyStep(PipelineStep[ExecutionContext]):
                 def run(self) -> None:
                     pass
                 def get_inputs(self) -> List[Path]:

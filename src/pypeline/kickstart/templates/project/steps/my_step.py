@@ -3,10 +3,11 @@ from typing import List
 
 from py_app_dev.core.logging import logger
 
+from pypeline.domain.execution_context import ExecutionContext
 from pypeline.domain.pipeline import PipelineStep
 
 
-class MyStep(PipelineStep):
+class MyStep(PipelineStep[ExecutionContext]):
     def run(self) -> None:
         logger.info(f"Run {self.get_name()} found install dirs:")
         for install_dir in self.execution_context.install_dirs:

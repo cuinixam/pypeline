@@ -45,9 +45,9 @@ def create_scoop_wrapper() -> ScoopWrapper:
     return ScoopWrapper()
 
 
-class ScoopInstall(PipelineStep):
-    def __init__(self, execution_context: ExecutionContext, output_dir: Path, config: Optional[Dict[str, Any]] = None) -> None:
-        super().__init__(execution_context, output_dir, config)
+class ScoopInstall(PipelineStep[ExecutionContext]):
+    def __init__(self, execution_context: ExecutionContext, group_name: str, config: Optional[Dict[str, Any]] = None) -> None:
+        super().__init__(execution_context, group_name, config)
         self.logger = logger.bind()
         self.execution_info = ScoopInstallExecutionInfo([])
         # One needs to keep track of the installed apps to get the required paths

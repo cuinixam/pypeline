@@ -1,4 +1,3 @@
-from pathlib import Path
 from typing import Optional
 from unittest.mock import Mock
 
@@ -13,7 +12,7 @@ def test_create_venv(execution_context: Mock, bootstrap_script: Optional[str]) -
     bootstrap_py.parent.mkdir(parents=True, exist_ok=True)
     bootstrap_py.write_text("")
     config = {"bootstrap_script": bootstrap_script} if bootstrap_script else None
-    create_venv = CreateVEnv(execution_context, Path("out"), config)
+    create_venv = CreateVEnv(execution_context, "group_name", config)
     create_venv.run()
     # check that the bootstrap.py script is executed
     execution_context.create_process_executor.assert_called_once_with(["python", bootstrap_py.as_posix()], cwd=execution_context.project_root_dir)
