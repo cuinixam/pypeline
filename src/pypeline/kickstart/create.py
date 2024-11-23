@@ -51,6 +51,5 @@ class KickstartProject:
         project_builder = ProjectBuilder(self.project_dir)
         if self.force:
             project_builder.with_disable_target_directory_check()
-        project_builder.with_dir("bootstrap")
         project_builder.with_dir("project")
         project_builder.build()

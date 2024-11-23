@@ -57,7 +57,6 @@ def kickstart_files() -> List[str]:
         "pypeline.yaml",
         "pyproject.toml",
         "scoopfile.json",
-        "bootstrap.py",
         "bootstrap.ps1",
         "steps/my_step.py",
     ]
