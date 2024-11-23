@@ -2,6 +2,13 @@
 
 
 
+## v1.1.0 (2024-11-23)
+
+### Feature
+
+* feat: use avengineers/bootstrap ([`05b257b`](https://github.com/cuinixam/pypeline/commit/05b257b0ac9821b42a04286694976fa8698b3157))
+
+
 ## v1.0.0 (2024-09-29)
 
 ### Breaking
