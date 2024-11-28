@@ -2,6 +2,13 @@
 
 
 
+## v1.2.0 (2024-11-28)
+
+### Feature
+
+* feat: scoop install works behind a proxy ([`ad88d50`](https://github.com/cuinixam/pypeline/commit/ad88d505bbcff620927d65b2a77bdae3c70af37f))
+
+
 ## v1.1.0 (2024-11-23)
 
 ### Feature
