@@ -2,6 +2,13 @@
 
 
 
+## v1.3.0 (2024-12-17)
+
+### Feature
+
+* feat: groups are optional ([`3aadae1`](https://github.com/cuinixam/pypeline/commit/3aadae19fff50cce57c04546e01b14ff94608645))
+
+
 ## v1.2.0 (2024-11-28)
 
 ### Feature
