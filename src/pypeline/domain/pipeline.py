@@ -5,12 +5,15 @@ from typing import (
     Any,
     Dict,
     Generic,
+    Iterator,
     List,
     Optional,
     OrderedDict,
+    Tuple,
     Type,
     TypeAlias,
     TypeVar,
+    Union,
 )
 
 from mashumaro import DataClassDictMixin
@@ -39,7 +42,27 @@ class PipelineStepConfig(DataClassDictMixin):
     config: Optional[Dict[str, Any]] = None
 
 
-PipelineConfig: TypeAlias = OrderedDict[str, List[PipelineStepConfig]]
+PipelineConfig: TypeAlias = Union[List[PipelineStepConfig], OrderedDict[str, List[PipelineStepConfig]]]
+
+
+class PipelineConfigIterator:
+    """
+    Iterates over the pipeline configuration, yielding group name and steps configuration.
+
+    This class abstracts the iteration logic for PipelineConfig, which can be:
+    - A list of steps (group name is None)
+    - An OrderedDict with group names as keys and lists of steps as values.
+
+    The iterator yields tuples of (group_name, steps).
+    """
+
+    def __init__(self, pipeline_config: PipelineConfig) -> None:
+        self._items = pipeline_config.items() if isinstance(pipeline_config, OrderedDict) else [(None, pipeline_config)]
+
+    def __iter__(self) -> Iterator[Tuple[Optional[str], List[PipelineStepConfig]]]:
+        """Return an iterator."""
+        yield from self._items
+
 
 TExecutionContext = TypeVar("TExecutionContext", bound=ExecutionContext)
 
@@ -47,7 +70,7 @@ TExecutionContext = TypeVar("TExecutionContext", bound=ExecutionContext)
 class PipelineStep(Generic[TExecutionContext], Runnable):
     """One can create subclasses of PipelineStep that specify the type of ExecutionContext they require."""
 
-    def __init__(self, execution_context: TExecutionContext, group_name: str, config: Optional[Dict[str, Any]] = None) -> None:
+    def __init__(self, execution_context: TExecutionContext, group_name: Optional[str], config: Optional[Dict[str, Any]] = None) -> None:
         super().__init__(self.get_needs_dependency_management())
         self.execution_context = execution_context
         self.group_name = group_name
@@ -56,7 +79,10 @@ class PipelineStep(Generic[TExecutionContext], Runnable):
 
     @property
     def output_dir(self) -> Path:
-        return self.execution_context.create_artifacts_locator().build_dir.joinpath(self.group_name)
+        output_dir = self.execution_context.create_artifacts_locator().build_dir
+        if self.group_name:
+            output_dir = output_dir / self.group_name
+        return output_dir
 
     @abstractmethod
     def update_execution_context(self) -> None:
@@ -73,7 +99,7 @@ class PipelineStep(Generic[TExecutionContext], Runnable):
 
 
 class PipelineStepReference(Generic[TExecutionContext]):
-    def __init__(self, group_name: str, _class: Type[PipelineStep[TExecutionContext]], config: Optional[Dict[str, Any]] = None) -> None:
+    def __init__(self, group_name: Optional[str], _class: Type[PipelineStep[TExecutionContext]], config: Optional[Dict[str, Any]] = None) -> None:
         self.group_name = group_name
         self._class = _class
         self.config = config

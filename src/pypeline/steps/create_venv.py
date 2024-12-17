@@ -19,7 +19,6 @@ class CreateVEnv(PipelineStep[ExecutionContext]):
     def __init__(self, execution_context: ExecutionContext, group_name: str, config: Optional[Dict[str, Any]] = None) -> None:
         super().__init__(execution_context, group_name, config)
         self.logger = logger.bind()
-        self.logger = logger.bind()
 
     @property
     def install_dirs(self) -> List[Path]:

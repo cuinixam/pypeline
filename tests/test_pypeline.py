@@ -27,6 +27,32 @@ def test_pipeline_loader(project: Path, pipeline_config: PipelineConfig) -> None
     assert steps_references[1].config is None
 
 
+def test_pipeline_loader_without_groups(project: Path) -> None:
+    # Create pypeline configuration without groups
+    pypeline_config = project / "pypeline.yaml"
+    pypeline_config.write_text(
+        textwrap.dedent(
+            """\
+            pipeline:
+                - step: MyStep
+                  file: my_python_file.py
+                  config:
+                    input: value
+                - step: ScoopInstall
+                  module: pypeline.steps.scoop_install
+                - step: Echo
+                  run: echo 'Hello'
+                  description: Simple step that runs a command
+            """
+        )
+    )
+    pipeline_config = ProjectConfig.from_file(ProjectArtifactsLocator(project).config_file).pipeline
+    steps_references = PipelineLoader[ExecutionContext](pipeline_config, project).load_steps_references()
+    assert [step_ref.name for step_ref in steps_references] == ["MyStep", "ScoopInstall", "Echo"]
+    assert steps_references[0].config == {"input": "value"}
+    assert steps_references[1].config is None
+
+
 def test_pipeline_loader_run_command_step(tmp_path: Path) -> None:
     config_file = tmp_path / "pypeline.yaml"
     config_file.write_text(

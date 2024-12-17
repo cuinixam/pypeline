@@ -17,7 +17,7 @@ from py_app_dev.core.runnable import Executor
 
 from .domain.artifacts import ProjectArtifactsLocator
 from .domain.execution_context import ExecutionContext
-from .domain.pipeline import PipelineConfig, PipelineStep, PipelineStepConfig, PipelineStepReference, TExecutionContext
+from .domain.pipeline import PipelineConfig, PipelineConfigIterator, PipelineStep, PipelineStepConfig, PipelineStepReference, TExecutionContext
 
 
 class PipelineLoader(Generic[TExecutionContext]):
@@ -35,13 +35,13 @@ class PipelineLoader(Generic[TExecutionContext]):
 
     def load_steps_references(self) -> List[PipelineStepReference[TExecutionContext]]:
         result = []
-        for group_name, steps_config in self.pipeline_config.items():
+        for group_name, steps_config in PipelineConfigIterator(self.pipeline_config):
             result.extend(self._load_steps(group_name, steps_config, self.project_root_dir))
         return result
 
     @staticmethod
     def _load_steps(
-        group_name: str,
+        group_name: Optional[str],
         steps_config: List[PipelineStepConfig],
         project_root_dir: Path,
     ) -> List[PipelineStepReference[TExecutionContext]]:

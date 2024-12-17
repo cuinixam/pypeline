@@ -8,6 +8,7 @@ from py_app_dev.core.logging import logger, setup_logger, time_it
 
 from pypeline import __version__
 from pypeline.domain.execution_context import ExecutionContext
+from pypeline.domain.pipeline import PipelineConfigIterator
 from pypeline.domain.project_slurper import ProjectSlurper
 from pypeline.kickstart.create import KickstartProject
 from pypeline.pypeline import PipelineScheduler, PipelineStepsExecutor
@@ -69,8 +70,9 @@ def run(
     project_slurper = ProjectSlurper(project_dir)
     if print:
         logger.info("Pipeline steps:")
-        for group, step_configs in project_slurper.pipeline.items():
-            logger.info(f"    Group: {group}")
+        for group, step_configs in PipelineConfigIterator(project_slurper.pipeline):
+            if group:
+                logger.info(f"    Group: {group}")
             for step_config in step_configs:
                 logger.info(f"        {step_config.step}")
         return

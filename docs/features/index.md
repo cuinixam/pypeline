@@ -71,7 +71,7 @@ pipeline:
       run: set
 ```
 
-### Groups
+### Groups (optional)
 
 In the `pypeline.yaml`, each top-level key under `pipeline` represents a `group` in the pipeline.
 These are only used to cluster together steps that are logically related.
