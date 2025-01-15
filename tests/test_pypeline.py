@@ -12,7 +12,8 @@ from pypeline.domain.execution_context import ExecutionContext
 from pypeline.domain.pipeline import PipelineConfig, PipelineStep, PipelineStepReference
 from pypeline.pypeline import PipelineLoader, PipelineScheduler, PipelineStepsExecutor
 from pypeline.steps.create_venv import CreateVEnv
-from tests.utils import assert_element_of_type
+
+from .utils import assert_element_of_type
 
 
 @pytest.fixture
@@ -53,14 +54,37 @@ def test_pipeline_loader_without_groups(project: Path) -> None:
     assert steps_references[1].config is None
 
 
-def test_pipeline_loader_run_command_step(tmp_path: Path) -> None:
+def test_pipeline_loader_run_command(tmp_path: Path) -> None:
     config_file = tmp_path / "pypeline.yaml"
     config_file.write_text(
         textwrap.dedent("""\
     pipeline:
         steps:
             - step: Echo
-              run: echo 'Hello'
+              run: echo "Hello"
+    """)
+    )
+    steps_references = PipelineLoader[ExecutionContext](
+        ProjectConfig.from_file(config_file).pipeline,
+        tmp_path,
+    ).load_steps_references()
+    step_ref = assert_element_of_type(steps_references, PipelineStepReference)
+    assert step_ref.name == "Echo"
+    step = step_ref._class(Mock(), Mock())
+    assert step.get_name() == "Echo"
+    # Execute the step
+    executor = PipelineStepsExecutor(ExecutionContext(tmp_path), steps_references)
+    executor.run()
+
+
+def test_pipeline_loader_run_command_with_list(tmp_path: Path) -> None:
+    config_file = tmp_path / "pypeline.yaml"
+    config_file.write_text(
+        textwrap.dedent("""\
+    pipeline:
+        steps:
+            - step: Echo
+              run: [python, -c, "print('Hello World')"]
               description: Simple step that runs a command
     """)
     )
@@ -72,13 +96,16 @@ def test_pipeline_loader_run_command_step(tmp_path: Path) -> None:
     assert step_ref.name == "Echo"
     step = step_ref._class(Mock(), Mock())
     assert step.get_name() == "Echo"
+    # Execute the step
+    executor = PipelineStepsExecutor(ExecutionContext(tmp_path), steps_references)
+    executor.run()
 
 
 def test_pipeline_create_run_command_step_class(execution_context: ExecutionContext) -> None:
     executor = PipelineStepsExecutor(
         execution_context,
         [
-            PipelineStepReference("my_cmd", cast(Type[PipelineStep[ExecutionContext]], PipelineLoader._create_run_command_step_class("echo 'Hello'", "Echo"))),
+            PipelineStepReference("my_cmd", cast(Type[PipelineStep[ExecutionContext]], PipelineLoader._create_run_command_step_class(["echo 'Hello'"], "Echo"))),
         ],
     )
     executor.run()

@@ -71,6 +71,33 @@ pipeline:
       run: set
 ```
 
+````{important}
+For executing a command using the `run` option, the command and its arguments shall be provided as a list of strings.
+For example:
+
+```{code-block} yaml
+:caption: Example command with multiple arguments
+pipeline:
+  group:
+    - step: HelloWorld
+      run: [python, -c, "print('Hello World')"]
+```
+````
+
+In case one provides the `run` option as a string, the command will be automatically split by spaces to form the command and its arguments.
+This means that this command will also work:
+
+```{code-block} yaml
+:caption: Example command as string
+pipeline:
+  group:
+    - step: Hello
+      run: echo "Hello"
+```
+
+```
+
+
 ### Groups (optional)
 
 In the `pypeline.yaml`, each top-level key under `pipeline` represents a `group` in the pipeline.
@@ -91,3 +118,4 @@ Create a virtual environment for the project using the [bootstrap](https://githu
 ## Install Scoop Applications
 
 Install applications using a [wrapper](https://python-app-dev.readthedocs.io/en/latest/features/scoop_wrapper.html) for the Scoop package manager for Windows.
+```

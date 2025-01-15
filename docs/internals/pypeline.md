@@ -7,12 +7,3 @@
    :members:
    :show-inheritance:
 ```
-
-## Testing
-
-```{eval-rst}
-.. automodule:: test_pypeline
-   :members:
-   :show-inheritance:
-
-```

@@ -32,8 +32,8 @@ class PipelineStepConfig(DataClassDictMixin):
     module: Optional[str] = None
     #: Step class name
     class_name: Optional[str] = None
-    #: Command to run. For simple steps that don't need a class
-    run: Optional[str] = None
+    #: Command to run. For simple steps that don't need a class. Example: run: [echo, 'Hello World!']
+    run: Optional[Union[str, List[str]]] = None
     #: Step description
     description: Optional[str] = None
     #: Step timeout in seconds

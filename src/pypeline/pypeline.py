@@ -53,7 +53,9 @@ class PipelineLoader(Generic[TExecutionContext]):
             elif step_config.file:
                 step_class = PipelineLoader._load_user_step(project_root_dir.joinpath(step_config.file), step_class_name)
             elif step_config.run:
-                step_class = PipelineLoader._create_run_command_step_class(step_config.run, step_class_name)
+                # We want the run field to always return a list of strings (the command and its arguments).
+                run_command = step_config.run.split(" ") if isinstance(step_config.run, str) else step_config.run
+                step_class = PipelineLoader._create_run_command_step_class(run_command, step_class_name)
             else:
                 raise UserNotificationException(f"Step '{step_class_name}' has no 'module' nor 'file' nor `run` defined." " Please check your pipeline configuration.")
             result.append(PipelineStepReference[TExecutionContext](group_name, cast(Type[PipelineStep[TExecutionContext]], step_class), step_config.config))
@@ -86,7 +88,7 @@ class PipelineLoader(Generic[TExecutionContext]):
         return step_class
 
     @staticmethod
-    def _create_run_command_step_class(command: str, name: str) -> Type[PipelineStep[ExecutionContext]]:
+    def _create_run_command_step_class(command: List[str], name: str) -> Type[PipelineStep[ExecutionContext]]:
         """Dynamically creates a step class for a given command."""
 
         class TmpDynamicRunCommandStep(PipelineStep[ExecutionContext]):
@@ -103,7 +105,8 @@ class PipelineLoader(Generic[TExecutionContext]):
 
             def run(self) -> int:
                 self.execution_context.create_process_executor(
-                    [self.command],
+                    # We have to disable type checking for the command because mypy considers that a List[str] is not compatible with a List[Union[str, Path]] :(
+                    self.command,  # type: ignore
                     cwd=self.project_root_dir,
                 ).execute()
                 return 0
