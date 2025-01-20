@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Optional
 
+from py_app_dev.core.data_registry import DataRegistry
 from py_app_dev.core.subprocess import SubprocessExecutor
 
 from .artifacts import ProjectArtifactsLocator
@@ -13,6 +14,8 @@ class ExecutionContext:
     project_root_dir: Path
     # Keep track of all install directories, updated by any step for the subsequent steps
     install_dirs: List[Path] = field(default_factory=list)
+    # Data registry to exchange data of any type
+    data_registry: DataRegistry = field(default_factory=DataRegistry)
 
     def add_install_dirs(self, install_dirs: List[Path]) -> None:
         self.install_dirs.extend(install_dirs)
