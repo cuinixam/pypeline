@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.5.0 (2025-01-20)
+
+### Features
+
+- Add data registry to execution context
+  ([`4e011ca`](https://github.com/cuinixam/pypeline/commit/4e011caea4f70ad53de7e3a23ce00b912d48146c))
+
+
 ## v1.4.0 (2025-01-15)
 
 ### Features
