@@ -57,14 +57,14 @@ class PipelineLoader(Generic[TExecutionContext]):
                 run_command = step_config.run.split(" ") if isinstance(step_config.run, str) else step_config.run
                 step_class = PipelineLoader._create_run_command_step_class(run_command, step_class_name)
             else:
-                raise UserNotificationException(f"Step '{step_class_name}' has no 'module' nor 'file' nor `run` defined." " Please check your pipeline configuration.")
+                raise UserNotificationException(f"Step '{step_class_name}' has no 'module' nor 'file' nor `run` defined. Please check your pipeline configuration.")
             result.append(PipelineStepReference[TExecutionContext](group_name, cast(Type[PipelineStep[TExecutionContext]], step_class), step_config.config))
         return result
 
     @staticmethod
     def _load_user_step(python_file: Path, step_class_name: str) -> Type[PipelineStep[ExecutionContext]]:
         # Create a module specification from the file path
-        spec = spec_from_file_location(f"user__{step_class_name}", python_file)
+        spec = spec_from_file_location(f"user__{python_file.stem}", python_file)
         if spec and spec.loader:
             step_module = module_from_spec(spec)
             # Import the module
@@ -72,9 +72,9 @@ class PipelineLoader(Generic[TExecutionContext]):
             try:
                 step_class = getattr(step_module, step_class_name)
             except AttributeError:
-                raise UserNotificationException(f"Could not load class '{step_class_name}' from file '{python_file}'." " Please check your pipeline configuration.") from None
+                raise UserNotificationException(f"Could not load class '{step_class_name}' from file '{python_file}'. Please check your pipeline configuration.") from None
             return step_class
-        raise UserNotificationException(f"Could not load file '{python_file}'." " Please check the file for any errors.")
+        raise UserNotificationException(f"Could not load file '{python_file}'. Please check the file for any errors.")
 
     @staticmethod
     def _load_module_step(module_name: str, step_class_name: str) -> Type[PipelineStep[ExecutionContext]]:
@@ -84,7 +84,7 @@ class PipelineLoader(Generic[TExecutionContext]):
         except ImportError:
             raise UserNotificationException(f"Could not load module '{module_name}'. Please check your pipeline configuration.") from None
         except AttributeError:
-            raise UserNotificationException(f"Could not load class '{step_class_name}' from module '{module_name}'." " Please check your pipeline configuration.") from None
+            raise UserNotificationException(f"Could not load class '{step_class_name}' from module '{module_name}'. Please check your pipeline configuration.") from None
         return step_class
 
     @staticmethod

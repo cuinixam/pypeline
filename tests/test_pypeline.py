@@ -201,3 +201,26 @@ def test_pipeline_executor_with_custom_context(project: Path) -> None:
     )
     executor.run()
     assert execution_context.extra_info == "updated"
+
+
+def test_pipeline_exchange_information_between_steps(project: Path) -> None:
+    config_file = project / "pypeline.yaml"
+    config_file.write_text(
+        textwrap.dedent("""\
+            pipeline:
+                - step: MyStep
+                  file: my_python_file.py
+                - step: MyStepChecker
+                  file: my_python_file.py
+            """)
+    )
+    steps_references = PipelineLoader[ExecutionContext](
+        ProjectConfig.from_file(config_file).pipeline,
+        project,
+    ).load_steps_references()
+    # Execute pypeline
+    execution_context = ExecutionContext(project)
+    executor = PipelineStepsExecutor(execution_context, steps_references)
+    executor.run()
+    my_data = [entry for entries in execution_context.data_registry._registry.values() for entry in entries if entry.provider_name == "MyStep"]
+    assert len(my_data) == 1, "MyData shall be inserted in the data registry"
