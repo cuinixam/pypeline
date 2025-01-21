@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.6.0 (2025-01-21)
+
+### Features
+
+- Data register supports dynamically loaded classes
+  ([`badb2aa`](https://github.com/cuinixam/pypeline/commit/badb2aa2a94799e2e48887b773ea68a840ca1748))
+
+
 ## v1.5.0 (2025-01-20)
 
 ### Features
