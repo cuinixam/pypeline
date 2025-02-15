@@ -62,6 +62,8 @@ def project(tmp_path: Path) -> Path:
             """
         )
     )
+    # Create a custom pypeline definition file for testing the `--config-file` option
+    tmp_path.joinpath("my_pypeline.yaml").write_text(pypeline_config.read_text())
     return tmp_path
 
 

@@ -10,13 +10,10 @@ CONFIG_FILENAME = "pypeline.yaml"
 class ProjectArtifactsLocator:
     """Provides paths to project artifacts."""
 
-    def __init__(
-        self,
-        project_root_dir: Path,
-    ) -> None:
+    def __init__(self, project_root_dir: Path, config_file: Optional[str] = None) -> None:
         self.project_root_dir = project_root_dir
         self.build_dir = project_root_dir / "build"
-        self.config_file = project_root_dir / CONFIG_FILENAME
+        self.config_file = project_root_dir.joinpath(config_file if config_file else CONFIG_FILENAME)
         self.external_dependencies_dir = self.build_dir / "external"
         scripts_dir = "Scripts" if sys.platform.startswith("win32") else "bin"
         self.venv_scripts_dir = self.project_root_dir.joinpath(".venv").joinpath(scripts_dir)

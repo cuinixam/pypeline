@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Optional
 
 from py_app_dev.core.exceptions import UserNotificationException
 from py_app_dev.core.logging import logger
@@ -8,9 +9,9 @@ from .config import PipelineConfig, ProjectConfig
 
 
 class ProjectSlurper:
-    def __init__(self, project_dir: Path) -> None:
+    def __init__(self, project_dir: Path, config_file: Optional[str] = None) -> None:
         self.logger = logger.bind()
-        self.artifacts_locator = ProjectArtifactsLocator(project_dir)
+        self.artifacts_locator = ProjectArtifactsLocator(project_dir, config_file)
         try:
             self.user_config: ProjectConfig = ProjectConfig.from_file(self.artifacts_locator.config_file)
         except FileNotFoundError:

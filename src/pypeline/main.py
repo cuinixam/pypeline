@@ -42,6 +42,7 @@ def init(
 @time_it("run")
 def run(
     project_dir: Path = typer.Option(Path.cwd().absolute(), help="The project directory"),  # noqa: B008,
+    config_file: Optional[str] = typer.Option(None, help="The name of the YAML configuration file containing the pypeline definition."),
     step: Optional[str] = typer.Option(
         None,
         help="Name of the step to run (as written in the pipeline config).",
@@ -67,7 +68,7 @@ def run(
         is_flag=True,
     ),
 ) -> None:
-    project_slurper = ProjectSlurper(project_dir)
+    project_slurper = ProjectSlurper(project_dir, config_file)
     if print:
         logger.info("Pipeline steps:")
         for group, step_configs in PipelineConfigIterator(project_slurper.pipeline):
