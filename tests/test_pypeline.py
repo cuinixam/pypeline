@@ -10,7 +10,7 @@ from pypeline.domain.artifacts import ProjectArtifactsLocator
 from pypeline.domain.config import ProjectConfig
 from pypeline.domain.execution_context import ExecutionContext
 from pypeline.domain.pipeline import PipelineConfig, PipelineStep, PipelineStepReference
-from pypeline.pypeline import PipelineLoader, PipelineScheduler, PipelineStepsExecutor
+from pypeline.pypeline import PipelineScheduler, PipelineStepsExecutor, RunCommandClassFactory
 from pypeline.steps.create_venv import CreateVEnv
 
 from .utils import assert_element_of_type
@@ -22,7 +22,7 @@ def pipeline_config(project: Path) -> PipelineConfig:
 
 
 def test_pipeline_loader(project: Path, pipeline_config: PipelineConfig) -> None:
-    steps_references = PipelineLoader[ExecutionContext](pipeline_config, project).load_steps_references()
+    steps_references = PipelineScheduler[ExecutionContext].create_pipeline_loader(pipeline_config, project).load_steps_references()
     assert [step_ref.name for step_ref in steps_references] == ["MyStep", "ScoopInstall", "Echo"]
     assert steps_references[0].config == {"input": "value"}
     assert steps_references[1].config is None
@@ -48,7 +48,7 @@ def test_pipeline_loader_without_groups(project: Path) -> None:
         )
     )
     pipeline_config = ProjectConfig.from_file(ProjectArtifactsLocator(project).config_file).pipeline
-    steps_references = PipelineLoader[ExecutionContext](pipeline_config, project).load_steps_references()
+    steps_references = PipelineScheduler[ExecutionContext].create_pipeline_loader(pipeline_config, project).load_steps_references()
     assert [step_ref.name for step_ref in steps_references] == ["MyStep", "ScoopInstall", "Echo"]
     assert steps_references[0].config == {"input": "value"}
     assert steps_references[1].config is None
@@ -64,16 +64,20 @@ def test_pipeline_loader_run_command(tmp_path: Path) -> None:
               run: echo "Hello"
     """)
     )
-    steps_references = PipelineLoader[ExecutionContext](
-        ProjectConfig.from_file(config_file).pipeline,
-        tmp_path,
-    ).load_steps_references()
+    steps_references = (
+        PipelineScheduler[ExecutionContext]
+        .create_pipeline_loader(
+            ProjectConfig.from_file(config_file).pipeline,
+            tmp_path,
+        )
+        .load_steps_references()
+    )
     step_ref = assert_element_of_type(steps_references, PipelineStepReference)
     assert step_ref.name == "Echo"
     step = step_ref._class(Mock(), Mock())
     assert step.get_name() == "Echo"
     # Execute the step
-    executor = PipelineStepsExecutor(ExecutionContext(tmp_path), steps_references)
+    executor = PipelineStepsExecutor[ExecutionContext](ExecutionContext(tmp_path), steps_references)
     executor.run()
 
 
@@ -88,24 +92,28 @@ def test_pipeline_loader_run_command_with_list(tmp_path: Path) -> None:
               description: Simple step that runs a command
     """)
     )
-    steps_references = PipelineLoader[ExecutionContext](
-        ProjectConfig.from_file(config_file).pipeline,
-        tmp_path,
-    ).load_steps_references()
+    steps_references = (
+        PipelineScheduler[ExecutionContext]
+        .create_pipeline_loader(
+            ProjectConfig.from_file(config_file).pipeline,
+            tmp_path,
+        )
+        .load_steps_references()
+    )
     step_ref = assert_element_of_type(steps_references, PipelineStepReference)
     assert step_ref.name == "Echo"
     step = step_ref._class(Mock(), Mock())
     assert step.get_name() == "Echo"
     # Execute the step
-    executor = PipelineStepsExecutor(ExecutionContext(tmp_path), steps_references)
+    executor = PipelineStepsExecutor[ExecutionContext](ExecutionContext(tmp_path), steps_references)
     executor.run()
 
 
 def test_pipeline_create_run_command_step_class(execution_context: ExecutionContext) -> None:
-    executor = PipelineStepsExecutor(
+    executor = PipelineStepsExecutor[ExecutionContext](
         execution_context,
         [
-            PipelineStepReference("my_cmd", cast(Type[PipelineStep[ExecutionContext]], PipelineLoader._create_run_command_step_class(["echo 'Hello'"], "Echo"))),
+            PipelineStepReference("my_cmd", cast(Type[PipelineStep[ExecutionContext]], RunCommandClassFactory._create_run_command_step_class(["echo 'Hello'"], "Echo"))),
         ],
     )
     executor.run()
@@ -214,13 +222,17 @@ def test_pipeline_exchange_information_between_steps(project: Path) -> None:
                   file: my_python_file.py
             """)
     )
-    steps_references = PipelineLoader[ExecutionContext](
-        ProjectConfig.from_file(config_file).pipeline,
-        project,
-    ).load_steps_references()
+    steps_references = (
+        PipelineScheduler[ExecutionContext]
+        .create_pipeline_loader(
+            ProjectConfig.from_file(config_file).pipeline,
+            project,
+        )
+        .load_steps_references()
+    )
     # Execute pypeline
     execution_context = ExecutionContext(project)
-    executor = PipelineStepsExecutor(execution_context, steps_references)
+    executor = PipelineStepsExecutor[ExecutionContext](execution_context, steps_references)
     executor.run()
     my_data = [entry for entries in execution_context.data_registry._registry.values() for entry in entries if entry.provider_name == "MyStep"]
     assert len(my_data) == 1, "MyData shall be inserted in the data registry"
