@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.8.0 (2025-02-16)
+
+### Features
+
+- Add bootstrap support for non-windows machines
+  ([`db57e12`](https://github.com/cuinixam/pypeline/commit/db57e12d66da5686475f7d951acabcb929c7a121))
+
+
 ## v1.7.0 (2025-02-16)
 
 ### Features
