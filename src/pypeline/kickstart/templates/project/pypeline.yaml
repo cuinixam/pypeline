@@ -3,7 +3,8 @@ pipeline:
     module: pypeline.steps.create_venv
     config:
       bootstrap_script: .bootstrap/bootstrap.py
-  - step: ScoopInstall
-    module: pypeline.steps.scoop_install
+  - step: WestInstall
+    module: pypeline.steps.west_install
+    description: Download external modules
   - step: MyStep
     file: steps/my_step.py

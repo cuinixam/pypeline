@@ -86,6 +86,9 @@ def test_init_default(kickstart_files: List[str], tmp_path: Path) -> None:
     for file in kickstart_files:
         assert tmp_path.joinpath(file).exists(), f"{file} shall exist"
 
+    result = runner.invoke(app, ["run", "--project-dir", tmp_path.as_posix()])
+    assert result.exit_code == 0
+
 
 def test_init_with_force_in_non_empty_directory(project: Path, kickstart_files: List[str]) -> None:
     result = runner.invoke(app, ["init", "--force", "--project-dir", project.as_posix()])

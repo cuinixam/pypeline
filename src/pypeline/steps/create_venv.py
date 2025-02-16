@@ -9,10 +9,12 @@ from py_app_dev.core.logging import logger
 from ..domain.execution_context import ExecutionContext
 from ..domain.pipeline import PipelineStep
 
+DEFAULT_BOOTSTRAP_SCRIPT = "bootstrap.py"
+
 
 @dataclass
 class CreateVEnvConfig(DataClassDictMixin):
-    bootstrap_script: str = "bootstrap.py"
+    bootstrap_script: str = DEFAULT_BOOTSTRAP_SCRIPT
 
 
 class CreateVEnv(PipelineStep[ExecutionContext]):
@@ -32,9 +34,14 @@ class CreateVEnv(PipelineStep[ExecutionContext]):
         config = CreateVEnvConfig.from_dict(self.config) if self.config else CreateVEnvConfig()
         bootstrap_script = self.project_root_dir / config.bootstrap_script
         if not bootstrap_script.exists():
-            raise UserNotificationException("Failed to find bootstrap script. Make sure that the project is initialized correctly.")
+            if config.bootstrap_script == DEFAULT_BOOTSTRAP_SCRIPT:
+                raise UserNotificationException(f"Failed to find bootstrap script '{config.bootstrap_script}'. Make sure that the project is initialized correctly.")
+            else:  # Fallback to default bootstrap script
+                bootstrap_script = self.project_root_dir / DEFAULT_BOOTSTRAP_SCRIPT
+                if not bootstrap_script.exists():
+                    raise UserNotificationException("Failed to find bootstrap script. Make sure that the project is initialized correctly.")
         self.execution_context.create_process_executor(
-            ["python", bootstrap_script.as_posix()],
+            ["python3", bootstrap_script.as_posix()],
             cwd=self.project_root_dir,
         ).execute()
         self.execution_context.add_install_dirs(self.install_dirs)

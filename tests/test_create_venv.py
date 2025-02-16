@@ -15,6 +15,6 @@ def test_create_venv(execution_context: Mock, bootstrap_script: Optional[str]) -
     create_venv = CreateVEnv(execution_context, "group_name", config)
     create_venv.run()
     # check that the bootstrap.py script is executed
-    execution_context.create_process_executor.assert_called_once_with(["python", bootstrap_py.as_posix()], cwd=execution_context.project_root_dir)
+    execution_context.create_process_executor.assert_called_once_with(["python3", bootstrap_py.as_posix()], cwd=execution_context.project_root_dir)
     # check that the install directories are added to the execution context
     execution_context.add_install_dirs.assert_called_once()
