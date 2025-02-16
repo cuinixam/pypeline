@@ -24,7 +24,9 @@ class ExecutionContext:
         # Add the install directories to the PATH
         env = os.environ.copy()
         env["PATH"] = os.pathsep.join([path.absolute().as_posix() for path in self.install_dirs] + [env["PATH"]])
-        return SubprocessExecutor(command, cwd=cwd, env=env, shell=True)  # noqa: S604
+        # When started from a windows shell (e.g. cmd on Jenkins) the shell parameter must be set to True
+        shell = True if os.name == "nt" else False
+        return SubprocessExecutor(command, cwd=cwd, env=env, shell=shell)
 
     def create_artifacts_locator(self) -> ProjectArtifactsLocator:
         return ProjectArtifactsLocator(self.project_root_dir)
