@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.7.0 (2025-02-16)
+
+### Features
+
+- Add support for custom config file
+  ([`1344a9b`](https://github.com/cuinixam/pypeline/commit/1344a9bf07488f519581dfc6518dfcdae226f12c))
+
+
 ## v1.6.0 (2025-01-21)
 
 ### Features
