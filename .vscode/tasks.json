@@ -2,42 +2,12 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "install dependencies",
-      "command": ".venv/bin/poetry install --with=dev --with=docs",
-      "windows": {
-        "command": ".venv/Scripts/poetry install --with=dev --with=docs"
-      },
-      "type": "shell",
-      "presentation": {
-        "reveal": "always"
-      },
-      "group": {
-        "kind": "build",
-        "isDefault": false
-      }
-    },
-    {
       "label": "run tests",
       "command": ".venv/bin/poetry run pytest --cov",
       "windows": {
         "command": ".venv/Scripts/poetry run pytest --cov"
       },
       "type": "shell",
-      "presentation": {
-        "reveal": "always"
-      },
-      "group": {
-        "kind": "build",
-        "isDefault": false
-      }
-    },
-    {
-      "label": "run tests in file",
-      "type": "shell",
-      "command": ".venv/bin/poetry run pytest --cov ${file}",
-      "windows": {
-        "command": ".venv/Scripts/poetry run pytest --cov ${file}"
-      },
       "presentation": {
         "reveal": "always"
       },
@@ -78,21 +48,6 @@
       "command": ".venv/bin/poetry run pre-commit run --all-files",
       "windows": {
         "command": ".venv/Scripts/poetry run pre-commit run --all-files"
-      },
-      "type": "shell",
-      "presentation": {
-        "reveal": "always"
-      },
-      "group": {
-        "kind": "build",
-        "isDefault": false
-      }
-    },
-    {
-      "label": "bootstrap",
-      "command": "${workspaceFolder}/bootstrap.py",
-      "windows": {
-        "command": "${workspaceFolder}/bootstrap.ps1"
       },
       "type": "shell",
       "presentation": {

@@ -1,4 +1,10 @@
-# Pypeline
+<p align="center">
+<a href="https://pypeline-runner.readthedocs.io">
+<img align="center" src="https://github.com/cuinixam/pypeline/raw/main/logo.png" width="400"/>
+</a>
+</p>
+
+# pypeline - Define Your CI/CD Pipeline Once, Run It Anywhere
 
 <p align="center">
   <a href="https://github.com/cuinixam/pypeline/actions/workflows/ci.yml?query=branch%3Amain">
@@ -30,28 +36,71 @@
   <img src="https://img.shields.io/pypi/l/pypeline-runner.svg?style=flat-square" alt="License">
 </p>
 
-Pypeline is a Python application designed to streamline and automate the software development lifecycle, particularly the pipeline execution processes across various environments such as GitHub and Jenkins.
-The primary motivation for developing Pypeline stemmed from the need to unify and simplify the creation of build, test, and deployment pipelines that are traditionally defined separately across these platforms using GitHub workflows (YAML) and Jenkins pipelines (Jenkinsfile).
+Pypeline lets you define your build, test, and deployment pipeline in a single YAML file and run it _consistently_ across your local development environment and _any_ CI/CD platform (GitHub Actions, Jenkins, etc.). No more platform-specific configurations – write once, run anywhere.
 
 **Key Features**
 
 - **Unified Pipeline Definition**: Users can define their entire pipeline in a single YAML file, eliminating the need to switch between different syntaxes and configurations for different CI/CD tools.
 
-- **Extensibility**: Pypeline supports execution steps defined not only through local scripts but also from installed Python packages.
+- **Extensibility**: Pypeline supports execution steps defined not only through installed Python packages but also from local scripts.
 
-- **Execution Context**: Each step in the pipeline receives an execution context that can be updated during step execution. This allows for the sharing of information and state between steps.
+- **Execution Context**: Allow sharing information and state between steps. Each step in the pipeline receives an execution context that can be updated during step execution.
 
-- **Dependency Handling**: Dependency management ensures that only the necessary steps are executed, reducing runtime and resource usage by avoiding unnecessary operations.
-
-- **Ease of Use**: With Pypeline, setting up and running pipelines becomes more straightforward, enabling developers to focus more on coding and less on configuring pipeline specifics.
+- **Dependency Handling**: Every step can register its dependencies and will only be scheduled if anything has changed.
 
 ## Installation
 
-Install this via pip (or your favourite package manager):
+Use pipx (or your favorite package manager) to install and run it in an isolated environment:
 
-`pip install pypeline-runner`
+```shell
+pipx install pypeline-runner
+```
 
-## Start developing
+This will install the `pypeline` command globally, which you can use to run your pipelines.
+
+> [!NOTE]
+> The Python package is called `pypeline-runner` because the name `pypeline` was already taken on PyPI.
+> The command-line interface is `pypeline`.
+
+Documentation: [pypeline-runner.readthedocs.io](https://pypeline-runner.readthedocs.io)
+
+## Walkthrough: Getting Started with Pypeline
+
+To get started run the `init` command to create a sample project:
+
+```shell
+pypeline init --project-dir my-pipeline
+```
+
+The example project pipeline is defined in the `pipeline.yaml` file.
+
+```yaml
+pipeline:
+  - step: CreateVEnv
+    module: pypeline.steps.create_venv
+    config:
+      bootstrap_script: .bootstrap/bootstrap.py
+  - step: WestInstall
+    module: pypeline.steps.west_install
+    description: Download external modules
+  - step: MyStep
+    file: steps/my_step.py
+    description: Run a custom script
+```
+
+This pipeline consists of three steps:
+
+- `CreateVEnv`: This is a built-in step that creates a Python virtual environment.
+- `WestInstall`: This is a built-in step that downloads external modules using the `west` tool.
+- `MyStep`: This is a custom step that runs a script defined in the `steps/my_step.py` file.
+
+You can run the pipeline using the `run` command:
+
+```shell
+pypeline run --project-dir my-pipeline
+```
+
+## Contributing
 
 The project uses Poetry for dependencies management and packaging.
 Run the `bootstrap.ps1` script to install Python and create the virtual environment.
@@ -60,42 +109,21 @@ Run the `bootstrap.ps1` script to install Python and create the virtual environm
 .\bootstrap.ps1
 ```
 
-This will also generate a `poetry.lock` file, you should track this file in version control.
-
 To execute the test suite, call pytest inside Poetry's virtual environment via `poetry run`:
 
 ```shell
 .venv/Scripts/poetry run pytest
 ```
 
-Check out the Poetry documentation for more information on the available commands.
-
 For those using [VS Code](https://code.visualstudio.com/) there are tasks defined for the most common commands:
 
-- bootstrap
-- install dependencies
 - run tests
 - run all checks configured for pre-commit
 - generate documentation
 
 See the `.vscode/tasks.json` for more details.
 
-## Committing changes
-
 This repository uses [commitlint](https://github.com/conventional-changelog/commitlint) for checking if the commit message meets the [conventional commit format](https://www.conventionalcommits.org/en).
-
-## Contributors ✨
-
-Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/docs/en/emoji-key)):
-
-<!-- prettier-ignore-start -->
-<!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
-<!-- markdownlint-disable -->
-<!-- markdownlint-enable -->
-<!-- ALL-CONTRIBUTORS-LIST:END -->
-<!-- prettier-ignore-end -->
-
-This project follows the [all-contributors](https://github.com/all-contributors/all-contributors) specification. Contributions of any kind welcome!
 
 ## Credits
 

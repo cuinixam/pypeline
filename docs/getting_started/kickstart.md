@@ -4,47 +4,53 @@ This guide will walk you through the process of installing Pypeline and kick-sta
 
 ## Installation
 
-To install Pypeline, run the following command:
+Use pipx (or your favorite package manager) to install and run it in an isolated environment:
 
-```bash
-pip install pypeline-runner
+```shell
+pipx install pypeline-runner
 ```
 
-If you cloned the repository, follow the steps in the `README` to bootstrap the project and install the dependencies.
+This will install the `pypeline` command globally, which you can use to run your pipelines.
+
+```{note}
+The Python package is called `pypeline-runner` because the name `pypeline` was already taken on PyPI.
+The command-line interface is `pypeline`.
+```
+
+Documentation: [pypeline-runner.readthedocs.io](https://pypeline-runner.readthedocs.io)
 
 ## Kickstart
 
-Pypeline provides a command-line interface (CLI) to help you create a new project. To create a new project, run the following command:
+To get started run the `init` command to create a sample project:
 
-```bash
-pypeline init --project-dir <some path>
+```shell
+pypeline init --project-dir my-pipeline
 ```
 
-:::{note}
-Replace `<some path>` with the path where you want to create the project.
-:::
+The example project pipeline is defined in the `pipeline.yaml` file.
 
-If you cloned the repository, follow the steps in the `README` to install the dependencies and then run:
-
-```powershell
-.\pypeline.ps1  init --project-dir <some path>
+```yaml
+pipeline:
+  - step: CreateVEnv
+    module: pypeline.steps.create_venv
+    config:
+      bootstrap_script: .bootstrap/bootstrap.py
+  - step: WestInstall
+    module: pypeline.steps.west_install
+    description: Download external modules
+  - step: MyStep
+    file: steps/my_step.py
+    description: Run a custom script
 ```
 
-:::{note}
-`pypeline.ps1` is a PowerShell script that wraps the Pypeline CLI.
-:::
+This pipeline consists of three steps:
 
-## Check the Project
+- `CreateVEnv`: This is a built-in step that creates a Python virtual environment.
+- `WestInstall`: This is a built-in step that downloads external modules using the `west` tool.
+- `MyStep`: This is a custom step that runs a script defined in the `steps/my_step.py` file.
 
-Navigate to the project directory and check the contents. You should see the following files:
+You can run the pipeline using the `run` command:
 
-- `pypeline.yaml`: The pipeline definition file
-- `steps/`: The directory containing the pipeline steps
-
-To run the pipeline, execute the following command from the project directory:
-
-```powershell
-.\pypeline.ps1 run
+```shell
+pypeline run --project-dir my-pipeline
 ```
-
-Happy coding!

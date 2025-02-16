@@ -95,9 +95,6 @@ pipeline:
       run: echo "Hello"
 ```
 
-```
-
-
 ### Groups (optional)
 
 In the `pypeline.yaml`, each top-level key under `pipeline` represents a `group` in the pipeline.
@@ -118,4 +115,7 @@ Create a virtual environment for the project using the [bootstrap](https://githu
 ## Install Scoop Applications
 
 Install applications using a [wrapper](https://python-app-dev.readthedocs.io/en/latest/features/scoop_wrapper.html) for the Scoop package manager for Windows.
+
+```
+
 ```
