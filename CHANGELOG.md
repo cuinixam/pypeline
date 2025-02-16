@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.8.1 (2025-02-16)
+
+### Bug Fixes
+
+- Can not run external processes on WSL
+  ([`d622cae`](https://github.com/cuinixam/pypeline/commit/d622cae99e0f621cdd658046a646f166b17b88f7))
+
+
 ## v1.8.0 (2025-02-16)
 
 ### Features
