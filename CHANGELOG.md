@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.9.0 (2025-03-24)
+
+### Features
+
+- Support multiple steps selection
+  ([`d655cd1`](https://github.com/cuinixam/pypeline/commit/d655cd1c6b821bfc7aa1cb8ae9b1c65433b2b903))
+
+
 ## v1.8.1 (2025-02-16)
 
 ### Bug Fixes
