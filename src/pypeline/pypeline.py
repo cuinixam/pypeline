@@ -115,22 +115,35 @@ class PipelineScheduler(Generic[TExecutionContext]):
         self.project_root_dir = project_root_dir
         self.logger = logger.bind()
 
-    def get_steps_to_run(self, step_name: Optional[str] = None, single: bool = False) -> List[PipelineStepReference[PipelineStep[TExecutionContext]]]:
-        return self.filter_steps_references(self.create_pipeline_loader(self.pipeline, self.project_root_dir).load_steps_references(), step_name, single)
+    def get_steps_to_run(self, step_names: Optional[List[str]] = None, single: bool = False) -> List[PipelineStepReference[PipelineStep[TExecutionContext]]]:
+        return self.filter_steps_references(self.create_pipeline_loader(self.pipeline, self.project_root_dir).load_steps_references(), step_names, single)
 
     @staticmethod
     def filter_steps_references(
         steps_references: List[PipelineStepReference[PipelineStep[TExecutionContext]]],
-        step_name: Optional[str],
+        step_names: Optional[List[str]],
         single: Optional[bool],
     ) -> List[PipelineStepReference[PipelineStep[TExecutionContext]]]:
-        if step_name:
-            step_reference = next((step for step in steps_references if step.name == step_name), None)
-            if not step_reference:
-                return []
-            if single:
-                return [step_reference]
-            return [step for step in steps_references if steps_references.index(step) <= steps_references.index(step_reference)]
+        if step_names:
+            found_steps = set()
+            filtered_step_refs = []
+
+            for step in steps_references:
+                if step.name in step_names:
+                    found_steps.add(step.name)
+                    if single:
+                        filtered_step_refs.append(step)
+                        break
+                    else:
+                        filtered_step_refs.append(step)
+
+            # Check if all input step names were found
+            missing_steps = set(step_names) - found_steps
+            if missing_steps:
+                raise UserNotificationException(f"Steps not found in pipeline configuration: {', '.join(missing_steps)}")
+
+            return filtered_step_refs
+
         return steps_references
 
     @staticmethod

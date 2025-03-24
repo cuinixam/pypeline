@@ -1,6 +1,6 @@
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 import typer
 from py_app_dev.core.exceptions import UserNotificationException
@@ -43,30 +43,11 @@ def init(
 def run(
     project_dir: Path = typer.Option(Path.cwd().absolute(), help="The project directory"),  # noqa: B008,
     config_file: Optional[str] = typer.Option(None, help="The name of the YAML configuration file containing the pypeline definition."),
-    step: Optional[str] = typer.Option(
-        None,
-        help="Name of the step to run (as written in the pipeline config).",
-    ),
-    single: bool = typer.Option(
-        False,
-        help="If provided, only the provided step will run, without running all previous steps in the pipeline.",
-        is_flag=True,
-    ),
-    print: bool = typer.Option(
-        False,
-        help="Print the pipeline steps.",
-        is_flag=True,
-    ),
-    force_run: bool = typer.Option(
-        False,
-        help="Force the execution of a step even if it is not dirty.",
-        is_flag=True,
-    ),
-    dry_run: bool = typer.Option(
-        False,
-        help="Do not run any step, just print the steps that would be executed.",
-        is_flag=True,
-    ),
+    step: Optional[List[str]] = typer.Option(None, help="Name of the step to run (as written in the pipeline config)."),  # noqa: B008
+    single: bool = typer.Option(False, help="If provided, only the provided step will run, without running all previous steps in the pipeline."),
+    print: bool = typer.Option(False, help="Print the pipeline steps."),
+    force_run: bool = typer.Option(False, help="Force the execution of a step even if it is not dirty."),
+    dry_run: bool = typer.Option(False, help="Do not run any step, just print the steps that would be executed."),
 ) -> None:
     project_slurper = ProjectSlurper(project_dir, config_file)
     if print:
@@ -79,11 +60,11 @@ def run(
         return
     if not project_slurper.pipeline:
         raise UserNotificationException("No pipeline found in the configuration.")
+    if single and step and len(step) > 1:
+        raise UserNotificationException("Only one step can be run with the --single flag.")
     # Schedule the steps to run
     steps_references = PipelineScheduler[ExecutionContext](project_slurper.pipeline, project_dir).get_steps_to_run(step, single)
     if not steps_references:
-        if step:
-            raise UserNotificationException(f"Step '{step}' not found in the pipeline.")
         logger.info("No steps to run.")
         return
 

@@ -59,6 +59,9 @@ def project(tmp_path: Path) -> Path:
                     - step: Echo
                       run: echo 'Hello'
                       description: Simple step that runs a command
+                commands:
+                    - step: CheckPython
+                      run: python --version
             """
         )
     )

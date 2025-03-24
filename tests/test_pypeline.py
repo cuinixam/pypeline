@@ -23,7 +23,7 @@ def pipeline_config(project: Path) -> PipelineConfig:
 
 def test_pipeline_loader(project: Path, pipeline_config: PipelineConfig) -> None:
     steps_references = PipelineScheduler[ExecutionContext].create_pipeline_loader(pipeline_config, project).load_steps_references()
-    assert [step_ref.name for step_ref in steps_references] == ["MyStep", "ScoopInstall", "Echo"]
+    assert [step_ref.name for step_ref in steps_references] == ["MyStep", "ScoopInstall", "Echo", "CheckPython"]
     assert steps_references[0].config == {"input": "value"}
     assert steps_references[1].config is None
 
@@ -124,19 +124,19 @@ def test_pipeline_scheduler(project: Path, pipeline_config: PipelineConfig) -> N
     scheduler = PipelineScheduler[ExecutionContext](pipeline_config, project)
     # All steps shall be scheduled
     steps_references = scheduler.get_steps_to_run()
-    assert [step_ref.name for step_ref in steps_references] == ["MyStep", "ScoopInstall", "Echo"]
+    assert [step_ref.name for step_ref in steps_references] == ["MyStep", "ScoopInstall", "Echo", "CheckPython"]
     # Only the step with the provided name shall be scheduled
-    steps_references = scheduler.get_steps_to_run(step_name="MyStep")
+    steps_references = scheduler.get_steps_to_run(step_names=["MyStep"])
     assert [step_ref.name for step_ref in steps_references] == ["MyStep"]
     # Single step execution
-    steps_references = scheduler.get_steps_to_run(step_name="ScoopInstall", single=True)
+    steps_references = scheduler.get_steps_to_run(step_names=["ScoopInstall"], single=True)
     assert [step_ref.name for step_ref in steps_references] == ["ScoopInstall"]
     # Single execution for step with a command
-    steps_references = scheduler.get_steps_to_run(step_name="Echo", single=True)
+    steps_references = scheduler.get_steps_to_run(step_names=["Echo"], single=True)
     assert [step_ref.name for step_ref in steps_references] == ["Echo"]
     # No steps are scheduled
-    steps_references = scheduler.get_steps_to_run(step_name="MissingStep", single=True)
-    assert [step_ref.name for step_ref in steps_references] == []
+    with pytest.raises(UserNotificationException):
+        scheduler.get_steps_to_run(step_names=["MissingStep"], single=True)
 
 
 class MyCustomPipelineStep(PipelineStep[ExecutionContext]):
