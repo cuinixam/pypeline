@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.9.1 (2025-03-24)
+
+### Bug Fixes
+
+- Can not select multiple steps
+  ([`8bdccaf`](https://github.com/cuinixam/pypeline/commit/8bdccaf940c1cabe9e564b486f619ce4581e76ef))
+
+
 ## v1.9.0 (2025-03-24)
 
 ### Features
