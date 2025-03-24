@@ -124,27 +124,36 @@ class PipelineScheduler(Generic[TExecutionContext]):
         step_names: Optional[List[str]],
         single: Optional[bool],
     ) -> List[PipelineStepReference[PipelineStep[TExecutionContext]]]:
-        if step_names:
-            found_steps = set()
-            filtered_step_refs = []
+        if not step_names:
+            return steps_references
 
+        step_names_set = set(step_names)
+        filtered_steps = []
+        found_steps = set()
+
+        if single:
+            # Include only the explicitly named steps, preserving order
+            filtered_steps = [step for step in steps_references if step.name in step_names_set]
+            found_steps = {step.name for step in filtered_steps}
+        else:
+            # Include all steps until the last explicitly named step is found
             for step in steps_references:
-                if step.name in step_names:
+                filtered_steps.append(step)
+                if step.name in step_names_set:
                     found_steps.add(step.name)
-                    if single:
-                        filtered_step_refs.append(step)
+                    if found_steps == step_names_set:
+                        # Once all named steps have been found, stop here
                         break
-                    else:
-                        filtered_step_refs.append(step)
-
-            # Check if all input step names were found
-            missing_steps = set(step_names) - found_steps
-            if missing_steps:
+            else:
+                # If loop completes without finding all named steps
+                missing_steps = step_names_set - found_steps
                 raise UserNotificationException(f"Steps not found in pipeline configuration: {', '.join(missing_steps)}")
 
-            return filtered_step_refs
+        missing_steps = step_names_set - found_steps
+        if missing_steps:
+            raise UserNotificationException(f"Steps not found in pipeline configuration: {', '.join(missing_steps)}")
 
-        return steps_references
+        return filtered_steps
 
     @staticmethod
     def create_pipeline_loader(pipeline: PipelineConfig, project_root_dir: Path) -> PipelineLoader[PipelineStep[TExecutionContext]]:

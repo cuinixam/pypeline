@@ -60,8 +60,6 @@ def run(
         return
     if not project_slurper.pipeline:
         raise UserNotificationException("No pipeline found in the configuration.")
-    if single and step and len(step) > 1:
-        raise UserNotificationException("Only one step can be run with the --single flag.")
     # Schedule the steps to run
     steps_references = PipelineScheduler[ExecutionContext](project_slurper.pipeline, project_dir).get_steps_to_run(step, single)
     if not steps_references:

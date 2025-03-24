@@ -44,6 +44,7 @@ def test_run_multiple_steps(artifacts_locator: ProjectArtifactsLocator) -> None:
             "MyStep",
             "--step",
             "CheckPython",
+            "--single",
         ],
     )
     assert result.exit_code == 0
