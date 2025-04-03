@@ -1218,14 +1218,14 @@ virtualenv = ">=20.10.0"
 
 [[package]]
 name = "py-app-dev"
-version = "2.8.0"
+version = "2.9.0"
 description = "My application development modules."
 optional = false
 python-versions = "<4.0,>=3.10"
 groups = ["main"]
 files = [
-    {file = "py_app_dev-2.8.0-py3-none-any.whl", hash = "sha256:d9ca2dd7462417a33e8a2031e872a7cac8986b1a4a7c6733285b4837dd44cedf"},
-    {file = "py_app_dev-2.8.0.tar.gz", hash = "sha256:f34ad860913fc766a67ad23d2cac6f9925eb45d47c07b4c9328ee5d5e33dc4db"},
+    {file = "py_app_dev-2.9.0-py3-none-any.whl", hash = "sha256:113295b04922a7dbcf9c9445e4a9afc487f92514fc8a8f708125f88aa8af6e6f"},
+    {file = "py_app_dev-2.9.0.tar.gz", hash = "sha256:23c39426d4110a73e70caf80ade70acad1a922739ee9a852a8d8b3d7d6913e79"},
 ]
 
 [package.dependencies]
@@ -2052,4 +2052,4 @@ dev = ["black (>=19.3b0) ; python_version >= \"3.6\"", "pytest (>=4.6.2)"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "8085e74344d65526a90eb43b55a134aedad4f5262b08426e3f81f8935d4c1be9"
+content-hash = "ec4984445054455c4ef6a969cea0435f5794811d3742c8a6a3373cb9dfd9a5b0"
