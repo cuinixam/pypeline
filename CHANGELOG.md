@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.10.0 (2025-04-03)
+
+### Features
+
+- Add step to generate env setup scripts
+  ([`037a74d`](https://github.com/cuinixam/pypeline/commit/037a74da00347684debdb86ef234e72aae9fcccd))
+
+
 ## v1.9.1 (2025-03-24)
 
 ### Bug Fixes
