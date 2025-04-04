@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.11.0 (2025-04-04)
+
+### Features
+
+- Support scoop apps versions
+  ([`2ea7141`](https://github.com/cuinixam/pypeline/commit/2ea7141d3bee48f0ea0ef0aeb97df181a81eee4a))
+
+
 ## v1.10.0 (2025-04-03)
 
 ### Features
