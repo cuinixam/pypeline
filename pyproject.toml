@@ -27,7 +27,7 @@ pypeline = "pypeline.main:main"
 
 [tool.poetry.dependencies]
 python = "^3.10"
-py-app-dev = "^2.9"
+py-app-dev = "^2.10"
 typer = "^0"
 pyyaml = "^6.0"
 

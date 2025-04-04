@@ -68,7 +68,9 @@ class ScoopInstall(PipelineStep[ExecutionContext]):
     def run(self) -> int:
         self.logger.debug(f"Run {self.get_name()} step. Output dir: {self.output_dir}")
         installed_apps = create_scoop_wrapper().install(self.scoop_file)
+        self.logger.debug("Installed apps:")
         for app in installed_apps:
+            self.logger.debug(f" - {app.name} ({app.version})")
             self.install_dirs.extend(app.get_all_required_paths())
         self.execution_info.to_json_file(self.execution_info_file)
         return 0

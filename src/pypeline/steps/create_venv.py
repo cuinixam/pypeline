@@ -55,3 +55,6 @@ class CreateVEnv(PipelineStep[ExecutionContext]):
 
     def update_execution_context(self) -> None:
         pass
+
+    def get_needs_dependency_management(self) -> bool:
+        return False
