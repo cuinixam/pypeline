@@ -21,3 +21,7 @@ class ProjectSlurper:
     @property
     def project_dir(self) -> Path:
         return self.artifacts_locator.project_root_dir
+
+    @property
+    def project_config(self) -> ProjectConfig:
+        return self.user_config

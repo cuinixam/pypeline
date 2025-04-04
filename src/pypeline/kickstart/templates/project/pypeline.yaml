@@ -1,3 +1,9 @@
+inputs:
+  my_input:
+    type: string
+    description: My input description
+    default: my_input_default
+
 pipeline:
   - step: CreateVEnv
     module: pypeline.steps.create_venv

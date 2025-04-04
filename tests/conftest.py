@@ -40,6 +40,13 @@ def project(tmp_path: Path) -> Path:
                     data = self.execution_context.data_registry.find_data(MyData)
                     if not data:
                         raise ValueError("Data not found")
+            class MyInputsChecker(BaseStep):
+                def run(self) -> None:
+                    input = self.execution_context.inputs.get("my_input")
+                    if not input:
+                        raise ValueError("Input not found")
+                    if input != "my_value":
+                        raise ValueError("Input value is not 'value'")
             """
         )
     )

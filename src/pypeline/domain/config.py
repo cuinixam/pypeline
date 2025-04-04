@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Literal, Optional
 
 import yaml
 from mashumaro import DataClassDictMixin
@@ -10,10 +10,23 @@ from yaml.scanner import ScannerError
 
 from .pipeline import PipelineConfig
 
+InputType = Literal["string", "integer", "boolean"]
+
+
+@dataclass
+class ProjectInput(DataClassDictMixin):
+    """Represents a single input parameter for a pipeline step similar to GitHub workflows inputs."""
+
+    type: InputType
+    description: Optional[str] = None
+    default: Optional[Any] = None
+    required: bool = False
+
 
 @dataclass
 class ProjectConfig(DataClassDictMixin):
     pipeline: PipelineConfig
+    inputs: Optional[Dict[str, ProjectInput]] = None
     # This field is intended to keep track of where configuration was loaded from and
     # it is automatically added when configuration is loaded from file
     file: Optional[Path] = None

@@ -1,7 +1,7 @@
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from py_app_dev.core.data_registry import DataRegistry
 from py_app_dev.core.subprocess import SubprocessExecutor
@@ -16,6 +16,8 @@ class ExecutionContext:
     install_dirs: List[Path] = field(default_factory=list)
     # Data registry to exchange data of any type
     data_registry: DataRegistry = field(default_factory=DataRegistry)
+    # Inputs provided for the pipeline run
+    inputs: Dict[str, Any] = field(default_factory=dict)
 
     def add_install_dirs(self, install_dirs: List[Path]) -> None:
         self.install_dirs.extend(install_dirs)

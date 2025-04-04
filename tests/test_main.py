@@ -1,3 +1,4 @@
+import textwrap
 from pathlib import Path
 from typing import List
 
@@ -80,6 +81,61 @@ def test_run_no_pypeline_config(tmp_path: Path) -> None:
     result = runner.invoke(app, ["run", "--project-dir", tmp_path.as_posix()], catch_exceptions=True)
     assert result.exit_code == 1
     assert isinstance(result.exception, UserNotificationException)
+
+
+def test_pipeline_read_inputs(project: Path) -> None:
+    config_file = project / "pypeline.yaml"
+    config_file.write_text(
+        textwrap.dedent("""\
+            inputs:
+                my_input:
+                    type: string
+                    description: My input description
+                    required: true
+                my_bool:
+                    type: boolean
+                    description: Some boolean input
+            pipeline:
+                - step: MyInputsChecker
+                  file: my_python_file.py
+            """)
+    )
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            "--project-dir",
+            project.as_posix(),
+            "--input",
+            "my_input=my_value",
+            "--input",
+            "my_bool=true",
+        ],
+    )
+    assert result.exit_code == 0
+
+
+def test_no_inputs_are_configured(project: Path) -> None:
+    config_file = project / "pypeline.yaml"
+    config_file.write_text(
+        textwrap.dedent("""\
+            pipeline:
+                - step: MyStep
+                  file: my_python_file.py
+            """)
+    )
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            "--project-dir",
+            project.as_posix(),
+            "--input",
+            "my_input=my_value",
+        ],
+    )
+    assert result.exit_code == 1
+    assert "Inputs are not accepted because there are no inputs defined" in str(result.exception)
 
 
 @pytest.fixture

@@ -10,6 +10,7 @@ from pypeline import __version__
 from pypeline.domain.execution_context import ExecutionContext
 from pypeline.domain.pipeline import PipelineConfigIterator
 from pypeline.domain.project_slurper import ProjectSlurper
+from pypeline.inputs_parser import InputsParser
 from pypeline.kickstart.create import KickstartProject
 from pypeline.pypeline import PipelineScheduler, PipelineStepsExecutor
 
@@ -48,6 +49,12 @@ def run(
     print: bool = typer.Option(False, help="Print the pipeline steps."),
     force_run: bool = typer.Option(False, help="Force the execution of a step even if it is not dirty."),
     dry_run: bool = typer.Option(False, help="Do not run any step, just print the steps that would be executed."),
+    inputs: Optional[List[str]] = typer.Option(  # noqa: B008
+        None,
+        "--input",
+        "-i",
+        help="Provide input parameters as key=value pairs (e.g., -i name=value -i flag=true).",
+    ),
 ) -> None:
     project_slurper = ProjectSlurper(project_dir, config_file)
     if print:
@@ -65,8 +72,15 @@ def run(
     if not steps_references:
         logger.info("No steps to run.")
         return
-
-    PipelineStepsExecutor[ExecutionContext](ExecutionContext(project_dir), steps_references, force_run, dry_run).run()
+    # Parse the inputs
+    input_definitions = project_slurper.project_config.inputs
+    if input_definitions is None and inputs:
+        raise UserNotificationException(f"Inputs are not accepted because there are no inputs defined in the '{project_slurper.project_config.file}' configuration.")
+    if input_definitions and inputs:
+        inputs_dict = InputsParser.from_inputs_definitions(input_definitions).parse_inputs(inputs)
+    else:
+        inputs_dict = {}
+    PipelineStepsExecutor[ExecutionContext](ExecutionContext(project_dir, inputs=inputs_dict), steps_references, force_run, dry_run).run()
 
 
 def main() -> None:
