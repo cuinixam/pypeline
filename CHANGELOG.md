@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.12.0 (2025-04-04)
+
+### Features
+
+- Support pypeline inputs configuration
+  ([`8aa4587`](https://github.com/cuinixam/pypeline/commit/8aa4587d4c700d51a77aed4f04fbd6b47fe6a1b0))
+
+
 ## v1.11.0 (2025-04-04)
 
 ### Features
