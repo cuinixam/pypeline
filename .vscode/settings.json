@@ -7,5 +7,6 @@
     "editor.defaultFormatter": "charliermarsh.ruff"
   },
   "python.analysis.typeCheckingMode": "basic",
+  "json.format.keepLines": true,
   "cSpell.words": ["pypeline", "slurper", "typer"]
 }
