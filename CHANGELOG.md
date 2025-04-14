@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.14.0 (2025-04-14)
+
+### Features
+
+- Run steps if the pypeline was updated
+  ([`30d46ca`](https://github.com/cuinixam/pypeline/commit/30d46ca2e4be4c203fe5d01e15a027773a6f9a2e))
+
+
 ## v1.13.0 (2025-04-14)
 
 ### Features
