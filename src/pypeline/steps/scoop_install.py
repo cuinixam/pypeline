@@ -1,7 +1,7 @@
 import io
 import json
 import traceback
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, ClassVar, Dict, List, Optional
 
@@ -18,6 +18,7 @@ from ..domain.pipeline import PipelineStep
 @dataclass
 class ScoopInstallExecutionInfo(DataClassJSONMixin):
     install_dirs: List[Path]
+    env_vars: Dict[str, Any] = field(default_factory=dict)
 
     class Config(BaseConfig):
         """Base configuration for JSON serialization with omitted None values."""
@@ -72,6 +73,8 @@ class ScoopInstall(PipelineStep[ExecutionContext]):
         for app in installed_apps:
             self.logger.debug(f" - {app.name} ({app.version})")
             self.install_dirs.extend(app.get_all_required_paths())
+            # Collect environment variables from each app
+            self.execution_info.env_vars.update(app.env_vars)
         self.execution_info.to_json_file(self.execution_info_file)
         return 0
 
@@ -82,8 +85,10 @@ class ScoopInstall(PipelineStep[ExecutionContext]):
         return [self.execution_info_file, *self.install_dirs]
 
     def update_execution_context(self) -> None:
-        install_dirs = ScoopInstallExecutionInfo.from_json_file(self.execution_info_file).install_dirs
+        execution_info = ScoopInstallExecutionInfo.from_json_file(self.execution_info_file)
         # Make the list unique and keep the order
-        unique_paths = list(dict.fromkeys(install_dirs))
+        unique_paths = list(dict.fromkeys(execution_info.install_dirs))
         # Update the install directories for the subsequent steps
         self.execution_context.add_install_dirs(unique_paths)
+        if execution_info.env_vars:
+            self.execution_context.add_env_vars(execution_info.env_vars)
