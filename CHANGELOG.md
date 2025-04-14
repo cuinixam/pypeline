@@ -1,6 +1,17 @@
 # CHANGELOG
 
 
+## v1.13.0 (2025-04-14)
+
+### Features
+
+- Add environment variables to the execution context
+  ([`81db839`](https://github.com/cuinixam/pypeline/commit/81db839be4e45b3be61f94953ed4612828b8b713))
+
+- Scoop install register the apps env vars
+  ([`5055956`](https://github.com/cuinixam/pypeline/commit/50559569790c372e9a07f441299a0fb5dd4e729b))
+
+
 ## v1.12.0 (2025-04-04)
 
 ### Features
