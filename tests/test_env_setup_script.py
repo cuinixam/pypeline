@@ -31,6 +31,8 @@ def test_setup_env_script(execution_context: Mock) -> None:
     env_file.write_text("KEY1=value1\nKEY2=")
     # Add install directories in the execution context
     execution_context.install_dirs = [Path("/path/to/dir1"), Path("path/dir2")]
+    # Add environment variables
+    execution_context.env_vars = {"KEY3": "value1"}
 
     generator = GenerateEnvSetupScript(execution_context, execution_context.project_root_dir)
     generator.run()
@@ -39,4 +41,4 @@ def test_setup_env_script(execution_context: Mock) -> None:
         script_file = generator.output_dir / script_name
         assert script_file.exists()
         content = script_file.read_text()
-        assert all(keyword in content for keyword in ["dir1", "dir2", "KEY1", "KEY2"])
+        assert all(keyword in content for keyword in ["dir1", "dir2", "KEY1", "KEY2", "KEY3"])

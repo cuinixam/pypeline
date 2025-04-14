@@ -31,6 +31,10 @@ class GenerateEnvSetupScript(PipelineStep[ExecutionContext]):
         else:
             logger.warning(f".env file not found: {dot_env_file}")
             env_vars = {}
+
+        # Merge execution context environment variables
+        env_vars.update(self.execution_context.env_vars)
+
         # Generate the environment setup scripts
         BatEnvSetupScriptGenerator(
             install_dirs=self.execution_context.install_dirs,
