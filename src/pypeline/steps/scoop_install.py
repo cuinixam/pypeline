@@ -13,6 +13,7 @@ from py_app_dev.core.scoop_wrapper import ScoopWrapper
 
 from ..domain.execution_context import ExecutionContext
 from ..domain.pipeline import PipelineStep
+from ..main import package_version_file
 
 
 @dataclass
@@ -79,7 +80,7 @@ class ScoopInstall(PipelineStep[ExecutionContext]):
         return 0
 
     def get_inputs(self) -> List[Path]:
-        return [self.scoop_file]
+        return [self.scoop_file, package_version_file()]
 
     def get_outputs(self) -> List[Path]:
         return [self.execution_info_file, *self.install_dirs]

@@ -7,7 +7,7 @@ from py_app_dev.core.exceptions import UserNotificationException
 from typer.testing import CliRunner
 
 from pypeline.domain.artifacts import ProjectArtifactsLocator
-from pypeline.main import __version__, app
+from pypeline.main import __version__, app, package_version_file
 
 runner = CliRunner()
 
@@ -178,3 +178,9 @@ def test_help() -> None:
     result = runner.invoke(app, ["--version"])
     assert result.exit_code == 0
     assert f"pypeline {__version__}" in result.output
+
+
+def test_package_version_file():
+    file = package_version_file()
+    assert file.exists(), "Package version file shall exist"
+    assert __version__ in file.read_text()

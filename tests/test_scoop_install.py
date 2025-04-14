@@ -33,6 +33,7 @@ def test_scoop_install(execution_context: Mock) -> None:
         scoop_install = ScoopInstall(execution_context, execution_context.project_root_dir)
         scoop_install.run()
 
+    assert len(scoop_install.get_inputs()) == 2, "Two inputs are expected: scoopfile.json and the package __init__.py"
     mock_scoop_wrapper.install.assert_called_once_with(scoop_file_json)
     execution_info_file = execution_context.project_root_dir.joinpath("scoop_install_exec_info.json")
     assert execution_info_file.exists(), "Execution info file shall exist"
