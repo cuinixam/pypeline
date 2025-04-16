@@ -102,6 +102,7 @@ lint.ignore = [
     "D102", # Missing docstring in public method
     "D103", # Missing docstring in public function
     "D104", # Missing docstring in public package
+    "D105", # Missing docstring in magic method
     "D107", # Missing docstring in `__init__`
     "D401", # First line of docstring should be in imperative mood
 ]

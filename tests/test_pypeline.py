@@ -11,7 +11,6 @@ from pypeline.domain.config import ProjectConfig
 from pypeline.domain.execution_context import ExecutionContext
 from pypeline.domain.pipeline import PipelineConfig, PipelineStep, PipelineStepReference
 from pypeline.pypeline import PipelineScheduler, PipelineStepsExecutor, RunCommandClassFactory
-from pypeline.steps.create_venv import CreateVEnv
 
 from .utils import assert_element_of_type
 
@@ -175,25 +174,9 @@ def test_pipeline_executor(execution_context: ExecutionContext) -> None:
     assert execution_context.project_root_dir.joinpath("build/MyStep/MyCustomPipelineStep.deps.json").exists(), "Step dependencies file shall exist"
 
 
-def test_pipeline_executor_dry_run(execution_context: ExecutionContext) -> None:
-    executor = PipelineStepsExecutor(
-        execution_context,
-        [
-            PipelineStepReference("venv", cast(Type[PipelineStep[ExecutionContext]], CreateVEnv), {"bootstrap_script": "does_not_exist.py"}),
-        ],
-        dry_run=True,
-    )
-    executor.run()
-    assert not execution_context.project_root_dir.joinpath("build/venv/CreateVEnvStep.deps.json").exists(), "Step dependencies file shall not exist"
-    # If the step is actually executed it fails because the bootstrap script does not exist
-    executor.dry_run = False
-    with pytest.raises(UserNotificationException):
-        executor.run()
-
-
 class MyExecutionContext(ExecutionContext):
     def __init__(self, project_root_dir: Path, extra_info: str) -> None:
-        super().__init__(project_root_dir)
+        super().__init__(project_root_dir=project_root_dir)
         self.extra_info = extra_info
 
 

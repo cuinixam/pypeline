@@ -1,11 +1,13 @@
-[tool.poetry]
-name = "Hello Pypeline"
+[project]
+name = "hello-pypeline"
 version = "0.0.1"
 description = "A simple generated project to get you started"
-authors = ["Your Name"]
-package-mode = false
-
-[tool.poetry.dependencies]
-python = ">=3.10,<4.0"
-pypeline-runner = "*"
-west = "*"
+authors = [
+    {name = "Your Name"},
+]
+requires-python = "<4.0,>=3.10"
+dependencies = [
+    "pypeline-runner>=1,<2",
+    "west>=1,<2",
+    "wrapt>=1,<2",
+]

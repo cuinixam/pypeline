@@ -3,18 +3,19 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from mashumaro import DataClassDictMixin
-from py_app_dev.core.exceptions import UserNotificationException
 from py_app_dev.core.logging import logger
+
+from pypeline.bootstrap.run import get_bootstrap_script
 
 from ..domain.execution_context import ExecutionContext
 from ..domain.pipeline import PipelineStep
 
-DEFAULT_BOOTSTRAP_SCRIPT = "bootstrap.py"
-
 
 @dataclass
 class CreateVEnvConfig(DataClassDictMixin):
-    bootstrap_script: str = DEFAULT_BOOTSTRAP_SCRIPT
+    bootstrap_script: str = "bootstrap.py"
+    python_executable: str = "python3"
+    package_manager: Optional[str] = None
 
 
 class CreateVEnv(PipelineStep[ExecutionContext]):
@@ -33,15 +34,16 @@ class CreateVEnv(PipelineStep[ExecutionContext]):
         self.logger.debug(f"Run {self.get_name()} step. Output dir: {self.output_dir}")
         config = CreateVEnvConfig.from_dict(self.config) if self.config else CreateVEnvConfig()
         bootstrap_script = self.project_root_dir / config.bootstrap_script
+        bootstrap_args = []
         if not bootstrap_script.exists():
-            if config.bootstrap_script == DEFAULT_BOOTSTRAP_SCRIPT:
-                raise UserNotificationException(f"Failed to find bootstrap script '{config.bootstrap_script}'. Make sure that the project is initialized correctly.")
-            else:  # Fallback to default bootstrap script
-                bootstrap_script = self.project_root_dir / DEFAULT_BOOTSTRAP_SCRIPT
-                if not bootstrap_script.exists():
-                    raise UserNotificationException("Failed to find bootstrap script. Make sure that the project is initialized correctly.")
+            self.logger.warning(f"Bootstrap script {bootstrap_script} does not exist. Use pypeline internal `bootstrap.py`.")
+            bootstrap_script = get_bootstrap_script()
+            # Only the internal bootstrap.py script supports arguments.
+            bootstrap_args = ["--project-dir", self.project_root_dir.as_posix()]
+            if config.package_manager:
+                bootstrap_args.extend(["--package-manager", f'"{config.package_manager}"'])
         self.execution_context.create_process_executor(
-            ["python3", bootstrap_script.as_posix()],
+            [config.python_executable, bootstrap_script.as_posix(), *bootstrap_args],
             cwd=self.project_root_dir,
         ).execute()
         self.execution_context.add_install_dirs(self.install_dirs)

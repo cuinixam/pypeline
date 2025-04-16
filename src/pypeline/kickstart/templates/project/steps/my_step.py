@@ -12,6 +12,7 @@ class MyStep(PipelineStep[ExecutionContext]):
         logger.info(f"Run {self.get_name()} found install dirs:")
         for install_dir in self.execution_context.install_dirs:
             logger.info(f" {install_dir}")
+        logger.info(f"my_input: {self.execution_context.get_input('my_input')}")
 
     def get_inputs(self) -> List[Path]:
         return []

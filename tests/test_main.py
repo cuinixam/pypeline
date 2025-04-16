@@ -142,12 +142,9 @@ def test_no_inputs_are_configured(project: Path) -> None:
 def kickstart_files() -> List[str]:
     return [
         ".gitignore",
-        "poetry.toml",
         "pypeline.ps1",
         "pypeline.yaml",
         "pyproject.toml",
-        "scoopfile.json",
-        "bootstrap.ps1",
         "steps/my_step.py",
     ]
 

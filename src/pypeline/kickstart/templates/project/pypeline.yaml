@@ -8,7 +8,8 @@ pipeline:
   - step: CreateVEnv
     module: pypeline.steps.create_venv
     config:
-      bootstrap_script: .bootstrap/bootstrap.py
+      package_manager: uv>=0.6
+      python_executable: python3
   - step: WestInstall
     module: pypeline.steps.west_install
     description: Download external modules
