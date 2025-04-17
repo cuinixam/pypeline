@@ -1,5 +1,4 @@
 import argparse
-import distutils.util
 from typing import Any, Dict, List
 
 from py_app_dev.core.exceptions import UserNotificationException
@@ -13,7 +12,7 @@ def _map_type_for_argparse(input_type: InputType) -> Any:
     elif input_type == "integer":
         return int
     elif input_type == "boolean":
-        return lambda x: bool(distutils.util.strtobool(x))
+        return argparse.BooleanOptionalAction  # Use BooleanOptionalAction for boolean arguments
     else:
         raise ValueError(f"Unsupported input type specified: {input_type}")
 
@@ -37,14 +36,23 @@ def create_argument_parser_from_definitions(
             help_text += f", Default: {definition.default}"
         help_text += ")"
 
-        parser.add_argument(
-            f"--{name}",
-            dest=name,  # Attribute name in the parsed namespace
-            help=help_text,
-            type=arg_type,  # Type conversion function
-            required=definition.required,
-            default=definition.default,
-        )
+        if definition.type == "boolean":
+            parser.add_argument(
+                f"--{name}",
+                dest=name,  # Attribute name in the parsed namespace
+                help=help_text,
+                action=arg_type,  # Use BooleanOptionalAction for boolean arguments
+                default=definition.default or False,
+            )
+        else:
+            parser.add_argument(
+                f"--{name}",
+                dest=name,
+                help=help_text,
+                type=arg_type,
+                required=definition.required,
+                default=definition.default,
+            )
 
     return parser
 
@@ -69,11 +77,13 @@ class InputsParser:
         try:
             args = []
             for item in inputs:
-                if "=" not in item:
-                    raise UserNotificationException(f"Invalid input format: '{item}', expected 'name=value'")
-                name, value = item.split("=", 1)
-                args.append(f"--{name}")
-                args.append(value)
+                if "=" in item:
+                    name, value = item.split("=", 1)
+                    args.append(f"--{name}")
+                    if value:
+                        args.append(value)
+                else:
+                    args.append(f"--{item}")
 
             parsed_namespace = self.parser.parse_args(args)
             return vars(parsed_namespace)

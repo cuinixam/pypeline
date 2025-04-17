@@ -21,8 +21,7 @@ def basic_definitions() -> Dict[str, ProjectInput]:
     [
         (["username=john"], {"username": "john", "retry": 3, "verbose": False}),
         (["username=alice", "retry=5"], {"username": "alice", "retry": 5, "verbose": False}),
-        (["username=bob", "verbose=true"], {"username": "bob", "retry": 3, "verbose": True}),
-        (["username=eve", "verbose=0"], {"username": "eve", "retry": 3, "verbose": False}),
+        (["username=bob", "verbose"], {"username": "bob", "retry": 3, "verbose": True}),
     ],
 )
 def test_valid_inputs(

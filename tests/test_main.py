@@ -109,7 +109,7 @@ def test_pipeline_read_inputs(project: Path) -> None:
             "--input",
             "my_input=my_value",
             "--input",
-            "my_bool=true",
+            "my_bool",
         ],
     )
     assert result.exit_code == 0
