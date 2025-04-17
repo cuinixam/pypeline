@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.15.1 (2025-04-17)
+
+### Bug Fixes
+
+- Boolean inputs require a value
+  ([`7127064`](https://github.com/cuinixam/pypeline/commit/71270645cabb3ad3551d71ca08c1bf135be45061))
+
+
 ## v1.15.0 (2025-04-17)
 
 ### Features
