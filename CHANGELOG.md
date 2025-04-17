@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.15.0 (2025-04-17)
+
+### Features
+
+- Integrate internal bootstrap to create env
+  ([`006000b`](https://github.com/cuinixam/pypeline/commit/006000b67c6d782d5918965144f4513a78576db8))
+
+
 ## v1.14.0 (2025-04-14)
 
 ### Features
