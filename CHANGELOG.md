@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.16.0 (2025-04-23)
+
+### Features
+
+- Internal bootstrap runs if config changes
+  ([`f95d0c8`](https://github.com/cuinixam/pypeline/commit/f95d0c83faba67dc08484ef27c73948b66203712))
+
+
 ## v1.15.1 (2025-04-17)
 
 ### Bug Fixes
