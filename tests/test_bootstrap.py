@@ -59,23 +59,6 @@ def test_gitignore_configure(tmp_path: Path) -> None:
     assert gitignore.read_text() == "*\n"
 
 
-def test_get_inputs(tmp_path: Path) -> None:
-    # Arrange
-    # Create some dummy files listed in CreateVirtualEnvironment.get_inputs
-    (tmp_path / "pyproject.toml").touch()
-    (tmp_path / "Pipfile").touch()
-
-    # Act
-    # Instantiate with a sample package manager specifier
-    creator = CreateVirtualEnvironment(tmp_path, "poetry>=1.2")
-    inputs = creator.get_inputs()
-
-    # Assert
-    # Check if some expected core files are correctly resolved to paths within tmp_path
-    assert tmp_path / "pyproject.toml" in inputs
-    assert tmp_path / "Pipfile" in inputs
-
-
 @pytest.mark.parametrize(
     "toml_content, expected_source",
     [

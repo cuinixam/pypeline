@@ -1,7 +1,6 @@
 import argparse
 import configparser
 import ensurepip
-import hashlib
 import json
 import logging
 import os
@@ -12,7 +11,6 @@ import tempfile
 import venv
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from enum import Enum
 from functools import total_ordering
 from pathlib import Path
 from typing import List, Optional, Tuple
@@ -151,106 +149,6 @@ class PyPiSourceParser:
                 sections.append(TomlSection(name, content))
 
         return sections
-
-
-class Runnable(ABC):
-    @abstractmethod
-    def run(self) -> int:
-        """Run stage."""
-
-    @abstractmethod
-    def get_name(self) -> str:
-        """Get stage name."""
-
-    @abstractmethod
-    def get_inputs(self) -> List[Path]:
-        """Get stage dependencies."""
-
-    @abstractmethod
-    def get_outputs(self) -> List[Path]:
-        """Get stage outputs."""
-
-
-class RunInfoStatus(Enum):
-    MATCH = (False, "Nothing has changed, previous execution information matches.")
-    NO_INFO = (True, "No previous execution information found.")
-    FILE_CHANGED = (True, "Dependencies have been changed.")
-
-    def __init__(self, should_run: bool, message: str) -> None:
-        self.should_run = should_run
-        self.message = message
-
-
-class Executor:
-    """
-    Accepts Runnable objects and executes them.
-
-    It create a file with the same name as the runnable's name
-    and stores the inputs and outputs with their hashes.
-    If the file exists, it checks the hashes of the inputs and outputs
-    and if they match, it skips the execution.
-    """
-
-    RUN_INFO_FILE_EXTENSION = ".deps.json"
-
-    def __init__(self, cache_dir: Path) -> None:
-        self.cache_dir = cache_dir
-
-    @staticmethod
-    def get_file_hash(path: Path) -> str:
-        """
-        Get the hash of a file.
-
-        Returns an empty string if the file does not exist.
-        """
-        if path.is_file():
-            with open(path, "rb") as file:
-                bytes = file.read()
-                readable_hash = hashlib.sha256(bytes).hexdigest()
-                return readable_hash
-        else:
-            return ""
-
-    def store_run_info(self, runnable: Runnable) -> None:
-        file_info = {
-            "inputs": {str(path): self.get_file_hash(path) for path in runnable.get_inputs()},
-            "outputs": {str(path): self.get_file_hash(path) for path in runnable.get_outputs()},
-        }
-
-        run_info_path = self.get_runnable_run_info_file(runnable)
-        run_info_path.parent.mkdir(parents=True, exist_ok=True)
-        with run_info_path.open("w") as f:
-            # pretty print the json file
-            json.dump(file_info, f, indent=4)
-
-    def get_runnable_run_info_file(self, runnable: Runnable) -> Path:
-        return self.cache_dir / f"{runnable.get_name()}{self.RUN_INFO_FILE_EXTENSION}"
-
-    def previous_run_info_matches(self, runnable: Runnable) -> RunInfoStatus:
-        run_info_path = self.get_runnable_run_info_file(runnable)
-        if not run_info_path.exists():
-            return RunInfoStatus.NO_INFO
-
-        with run_info_path.open() as f:
-            previous_info = json.load(f)
-
-        for file_type in ["inputs", "outputs"]:
-            for path_str, previous_hash in previous_info[file_type].items():
-                path = Path(path_str)
-                if self.get_file_hash(path) != previous_hash:
-                    return RunInfoStatus.FILE_CHANGED
-        return RunInfoStatus.MATCH
-
-    def execute(self, runnable: Runnable) -> int:
-        run_info_status = self.previous_run_info_matches(runnable)
-        if run_info_status.should_run:
-            logger.info(f"Runnable '{runnable.get_name()}' must run. {run_info_status.message}")
-            exit_code = runnable.run()
-            self.store_run_info(runnable)
-            return exit_code
-        logger.info(f"Runnable '{runnable.get_name()}' execution skipped. {run_info_status.message}")
-
-        return 0
 
 
 class UserNotificationException(Exception):
@@ -399,7 +297,7 @@ class UnixVirtualEnvironment(VirtualEnvironment):
         os.remove(temp_script_path)
 
 
-class CreateVirtualEnvironment(Runnable):
+class CreateVirtualEnvironment:
     def __init__(self, root_dir: Path, package_manager: str) -> None:
         self.root_dir = root_dir
         self.venv_dir = self.root_dir / ".venv"
@@ -422,9 +320,7 @@ class CreateVirtualEnvironment(Runnable):
         return "install"
 
     def run(self) -> int:
-        # Create the virtual environment if pip executable does not exist
-        if not self.virtual_env.pip_path().exists():
-            self.virtual_env.create()
+        self.virtual_env.create()
 
         # Get the PyPi source from pyproject.toml or Pipfile if it is defined
         pypi_source = PyPiSourceParser.from_pyproject(self.root_dir)
@@ -453,24 +349,6 @@ class CreateVirtualEnvironment(Runnable):
             return UnixVirtualEnvironment(venv_dir)
         else:
             raise UserNotificationException(f"Unsupported operating system: {sys.platform}")
-
-    def get_name(self) -> str:
-        return "create-virtual-environment"
-
-    def get_inputs(self) -> List[Path]:
-        venv_relevant_files = [
-            "uv.lock",
-            "poetry.lock",
-            "poetry.toml",
-            "pyproject.toml",
-            ".env",
-            "Pipfile",
-            "Pipfile.lock",
-        ]
-        return [self.root_dir / file for file in venv_relevant_files] + [get_bootstrap_script()]
-
-    def get_outputs(self) -> List[Path]:
-        return []
 
 
 def print_environment_info() -> None:
@@ -501,8 +379,7 @@ def main() -> int:
         )
         args = parser.parse_args()
 
-        creator = CreateVirtualEnvironment(args.project_dir, package_manager=args.package_manager)
-        Executor(creator.venv_dir).execute(creator)
+        CreateVirtualEnvironment(args.project_dir, package_manager=args.package_manager).run()
     except UserNotificationException as e:
         logger.error(e)
         return 1

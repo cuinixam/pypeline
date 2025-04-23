@@ -3,6 +3,7 @@ from typing import Optional
 from unittest.mock import Mock
 
 import pytest
+from py_app_dev.core.exceptions import UserNotificationException
 
 from pypeline.bootstrap.run import get_bootstrap_script
 from pypeline.steps.create_venv import CreateVEnv
@@ -17,9 +18,13 @@ def test_create_venv_with_custom_script(execution_context: Mock, bootstrap_scrip
     create_venv = CreateVEnv(execution_context, "group_name", config)
     create_venv.run()
     # check that the bootstrap.py script is executed
-    execution_context.create_process_executor.assert_called_once_with(["python3", bootstrap_py.as_posix()], cwd=execution_context.project_root_dir)
-    # check that the install directories are added to the execution context
-    execution_context.add_install_dirs.assert_called_once()
+    execution_context.create_process_executor.assert_called_once_with(["python311", bootstrap_py.as_posix()], cwd=execution_context.project_root_dir)
+
+
+def test_create_venv_with_custom_script_not_found(execution_context: Mock) -> None:
+    create_venv = CreateVEnv(execution_context, "group_name", {"bootstrap_script": "custom_bootstrap.py"})
+    with pytest.raises(UserNotificationException):
+        create_venv.run()
 
 
 def test_create_venv_with_internal_script(execution_context: Mock) -> None:
@@ -29,12 +34,12 @@ def test_create_venv_with_internal_script(execution_context: Mock) -> None:
     # check that the bootstrap.py script is executed
     execution_context.create_process_executor.assert_called_once_with(
         [
-            "python3",
+            "python311",
             bootstrap_py.as_posix(),
             "--project-dir",
             Path(execution_context.project_root_dir).as_posix(),
+            "--package-manager",
+            '"uv>=0.6"',
         ],
         cwd=execution_context.project_root_dir,
     )
-    # check that the install directories are added to the execution context
-    execution_context.add_install_dirs.assert_called_once()
