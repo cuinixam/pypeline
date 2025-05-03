@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.16.1 (2025-05-03)
+
+### Bug Fixes
+
+- Create env retriggered because of different bootstrap location
+  ([`ed2e627`](https://github.com/cuinixam/pypeline/commit/ed2e627a4f0eb785daa776f1d8019bc1b17af986))
+
+
 ## v1.16.0 (2025-04-23)
 
 ### Features
