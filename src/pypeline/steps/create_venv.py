@@ -8,6 +8,7 @@ from mashumaro import DataClassDictMixin
 from py_app_dev.core.exceptions import UserNotificationException
 from py_app_dev.core.logging import logger
 
+from pypeline import __version__
 from pypeline.bootstrap.run import get_bootstrap_script
 
 from ..domain.execution_context import ExecutionContext
@@ -91,14 +92,14 @@ class CreateVEnv(PipelineStep[ExecutionContext]):
 
     def get_inputs(self) -> List[Path]:
         package_manager_relevant_file = self.SUPPORTED_PACKAGE_MANAGERS.get(self.package_manager_name, [])
-        return [self.project_root_dir / file for file in package_manager_relevant_file] + [self.bootstrap_script]
+        return [self.project_root_dir / file for file in package_manager_relevant_file]
 
     def get_outputs(self) -> List[Path]:
         return [self.venv_dir]
 
     def get_config(self) -> Optional[dict[str, str]]:
         return {
-            "bootstrap_script": self.bootstrap_script.as_posix(),
+            "version": __version__,
             "python_executable": self.python_executable,
             "package_manager": self.package_manager,
         }
