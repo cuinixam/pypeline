@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.18.0 (2025-06-04)
+
+### Features
+
+- Support option to skip venv pristine creation
+  ([`527fb49`](https://github.com/cuinixam/pypeline/commit/527fb4973de923a068855bb4a48beebeb41a9832))
+
+
 ## v1.17.0 (2025-06-04)
 
 ### Features
