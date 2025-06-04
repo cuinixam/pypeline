@@ -1,4 +1,5 @@
 import re
+import sys
 from dataclasses import dataclass
 from enum import Enum, auto
 from pathlib import Path
@@ -81,6 +82,12 @@ class CreateVEnv(PipelineStep[ExecutionContext]):
                 cwd=self.project_root_dir,
             ).execute()
         else:
+            skip_venv_creation = False
+            python_executable = Path(sys.executable).absolute()
+            if python_executable.is_relative_to(self.project_root_dir):
+                self.logger.info(f"Detected that the python executable '{python_executable}' is from the virtual environment. Skip updating the virtual environment.")
+                skip_venv_creation = True
+
             # The internal bootstrap script supports arguments.
             bootstrap_args = [
                 "--project-dir",
@@ -88,6 +95,8 @@ class CreateVEnv(PipelineStep[ExecutionContext]):
                 "--package-manager",
                 f'"{self.package_manager}"',
             ]
+            if skip_venv_creation:
+                bootstrap_args.append("--skip-venv-creation")
 
             # Copy the internal bootstrap script to the project root .bootstrap/bootstrap.py
             self.target_internal_bootstrap_script.parent.mkdir(exist_ok=True)

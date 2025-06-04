@@ -298,12 +298,13 @@ class UnixVirtualEnvironment(VirtualEnvironment):
 
 
 class CreateVirtualEnvironment:
-    def __init__(self, root_dir: Path, package_manager: str) -> None:
+    def __init__(self, root_dir: Path, package_manager: str, skip_venv_creation: bool = False) -> None:
         self.root_dir = root_dir
         self.venv_dir = self.root_dir / ".venv"
         self.virtual_env = self.instantiate_os_specific_venv(self.venv_dir)
         self.package_manager = package_manager.replace('"', "").replace("'", "")
         self.execution_info_file = self.venv_dir / "virtual_env_exec_info.json"
+        self.skip_venv_creation = skip_venv_creation
 
     @property
     def package_manager_name(self) -> str:
@@ -320,7 +321,10 @@ class CreateVirtualEnvironment:
         return "install"
 
     def run(self) -> int:
-        self.virtual_env.create()
+        if not self.skip_venv_creation:
+            self.virtual_env.create()
+        else:
+            logger.info("Skipping virtual environment creation as requested.")
 
         # Get the PyPi source from pyproject.toml or Pipfile if it is defined
         pypi_source = PyPiSourceParser.from_pyproject(self.root_dir)
@@ -377,9 +381,16 @@ def main() -> int:
             default=Path.cwd(),
             help="Specify the project directory (default: current working directory).",
         )
+        parser.add_argument(
+            "--skip-venv-creation",
+            action="store_true",
+            required=False,
+            default=False,
+            help="Skip the virtual environment creation process.",
+        )
         args = parser.parse_args()
 
-        CreateVirtualEnvironment(args.project_dir, package_manager=args.package_manager).run()
+        CreateVirtualEnvironment(args.project_dir, package_manager=args.package_manager, skip_venv_creation=args.skip_venv_creation).run()
     except UserNotificationException as e:
         logger.error(e)
         return 1
