@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.17.0 (2025-06-04)
+
+### Features
+
+- Deploy the bootstrap file in the project
+  ([`52f8b73`](https://github.com/cuinixam/pypeline/commit/52f8b73a5bc3eef900a8cd2cc1c7d29eb683ae62))
+
+
 ## v1.16.1 (2025-05-03)
 
 ### Bug Fixes
