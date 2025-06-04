@@ -41,7 +41,7 @@ class CreateVEnv(PipelineStep[ExecutionContext]):
         self.bootstrap_script_type = BootstrapScriptType.CUSTOM if self.user_config.bootstrap_script else BootstrapScriptType.INTERNAL
         super().__init__(execution_context, group_name, config)
         self.logger = logger.bind()
-        self.bootstrap_script = get_bootstrap_script()
+        self.internal_bootstrap_script = get_bootstrap_script()
         self.package_manager = self.user_config.package_manager if self.user_config.package_manager else self.DEFAULT_PACKAGE_MANAGER
         self.python_executable = self.user_config.python_executable if self.user_config.python_executable else self.DEFAULT_PYTHON_EXECUTABLE
         self.venv_dir = self.project_root_dir / ".venv"
@@ -61,6 +61,10 @@ class CreateVEnv(PipelineStep[ExecutionContext]):
                 raise UserNotificationException(f"Package manager {result} is not supported. Supported package managers are: {', '.join(self.SUPPORTED_PACKAGE_MANAGERS)}")
         else:
             raise UserNotificationException(f"Could not extract the package manager name from {self.package_manager}")
+
+    @property
+    def target_internal_bootstrap_script(self) -> Path:
+        return self.project_root_dir.joinpath(".bootstrap/bootstrap.py")
 
     def get_name(self) -> str:
         return self.__class__.__name__
@@ -84,10 +88,19 @@ class CreateVEnv(PipelineStep[ExecutionContext]):
                 "--package-manager",
                 f'"{self.package_manager}"',
             ]
+
+            # Copy the internal bootstrap script to the project root .bootstrap/bootstrap.py
+            self.target_internal_bootstrap_script.parent.mkdir(exist_ok=True)
+            if not self.target_internal_bootstrap_script.exists() or self.target_internal_bootstrap_script.read_text() != self.internal_bootstrap_script.read_text():
+                self.target_internal_bootstrap_script.write_text(self.internal_bootstrap_script.read_text())
+                self.logger.warning(f"Updated bootstrap script at {self.target_internal_bootstrap_script}")
+
+            # Run the copied bootstrap script
             self.execution_context.create_process_executor(
-                [self.python_executable, self.bootstrap_script.as_posix(), *bootstrap_args],
+                [self.python_executable, self.target_internal_bootstrap_script.as_posix(), *bootstrap_args],
                 cwd=self.project_root_dir,
             ).execute()
+
         return 0
 
     def get_inputs(self) -> List[Path]:
@@ -95,7 +108,10 @@ class CreateVEnv(PipelineStep[ExecutionContext]):
         return [self.project_root_dir / file for file in package_manager_relevant_file]
 
     def get_outputs(self) -> List[Path]:
-        return [self.venv_dir]
+        outputs = [self.venv_dir]
+        if self.bootstrap_script_type == BootstrapScriptType.INTERNAL:
+            outputs.append(self.target_internal_bootstrap_script)
+        return outputs
 
     def get_config(self) -> Optional[dict[str, str]]:
         return {

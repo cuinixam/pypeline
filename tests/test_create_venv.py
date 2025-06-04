@@ -5,7 +5,6 @@ from unittest.mock import Mock
 import pytest
 from py_app_dev.core.exceptions import UserNotificationException
 
-from pypeline.bootstrap.run import get_bootstrap_script
 from pypeline.steps.create_venv import CreateVEnv
 
 
@@ -28,14 +27,13 @@ def test_create_venv_with_custom_script_not_found(execution_context: Mock) -> No
 
 
 def test_create_venv_with_internal_script(execution_context: Mock) -> None:
-    bootstrap_py = get_bootstrap_script()
     create_venv = CreateVEnv(execution_context, "group_name")
     create_venv.run()
     # check that the bootstrap.py script is executed
     execution_context.create_process_executor.assert_called_once_with(
         [
             "python311",
-            bootstrap_py.as_posix(),
+            Path(execution_context.project_root_dir).joinpath(".bootstrap/bootstrap.py").as_posix(),
             "--project-dir",
             Path(execution_context.project_root_dir).as_posix(),
             "--package-manager",
