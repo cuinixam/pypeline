@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.18.1 (2025-06-26)
+
+### Bug Fixes
+
+- Pin pip-system-certs to avoid breaking changes
+  ([`35004c4`](https://github.com/cuinixam/pypeline/commit/35004c4e2b6b2c48e0fdb4418a0cc01248494116))
+
+
 ## v1.18.0 (2025-06-04)
 
 ### Features
