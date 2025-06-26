@@ -331,7 +331,7 @@ class CreateVirtualEnvironment:
         if pypi_source:
             self.virtual_env.pip_configure(index_url=pypi_source.url, verify_ssl=True)
         # We need pip-system-certs in venv to use certificates, that are stored in the system's trust store,
-        pip_args = ["install", self.package_manager, "pip-system-certs"]
+        pip_args = ["install", self.package_manager, "pip-system-certs>=4.0,<5.0"]
         # but to install it, we need either a pip version with the trust store feature or to trust the host
         # (trust store feature enabled by default since 24.2)
         if Version(ensurepip.version()) < Version("24.2"):
