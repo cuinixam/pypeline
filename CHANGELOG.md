@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.18.2 (2025-06-28)
+
+### Bug Fixes
+
+- Add missing dependency for the west step
+  ([`5c49bd4`](https://github.com/cuinixam/pypeline/commit/5c49bd4596ebd1984a86a2c5b26a9034a1bd9190))
+
+
 ## v1.18.1 (2025-06-26)
 
 ### Bug Fixes
