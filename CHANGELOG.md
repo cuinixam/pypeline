@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.19.0 (2025-08-15)
+
+### Features
+
+- Only load the steps scheduled to be executed
+  ([`b84adbc`](https://github.com/cuinixam/pypeline/commit/b84adbcd7726899a9bff6941ed391d4cef1feb55))
+
+
 ## v1.18.2 (2025-06-28)
 
 ### Bug Fixes
