@@ -5,6 +5,8 @@ from typing import (
     Generic,
     List,
     Optional,
+    OrderedDict,
+    Tuple,
     Type,
 )
 
@@ -14,7 +16,7 @@ from py_app_dev.core.runnable import Executor
 
 from .domain.artifacts import ProjectArtifactsLocator
 from .domain.execution_context import ExecutionContext
-from .domain.pipeline import PipelineConfig, PipelineLoader, PipelineStep, PipelineStepConfig, PipelineStepReference, StepClassFactory, TExecutionContext
+from .domain.pipeline import PipelineConfig, PipelineConfigIterator, PipelineLoader, PipelineStep, PipelineStepConfig, PipelineStepReference, StepClassFactory, TExecutionContext
 
 
 class RunCommandClassFactory(StepClassFactory[PipelineStep[TExecutionContext]]):
@@ -116,44 +118,76 @@ class PipelineScheduler(Generic[TExecutionContext]):
         self.logger = logger.bind()
 
     def get_steps_to_run(self, step_names: Optional[List[str]] = None, single: bool = False) -> List[PipelineStepReference[PipelineStep[TExecutionContext]]]:
-        return self.filter_steps_references(self.create_pipeline_loader(self.pipeline, self.project_root_dir).load_steps_references(), step_names, single)
+        return self.create_pipeline_loader(self.filter_steps(self.pipeline, step_names, single), self.project_root_dir).load_steps_references()
 
     @staticmethod
-    def filter_steps_references(
-        steps_references: List[PipelineStepReference[PipelineStep[TExecutionContext]]],
-        step_names: Optional[List[str]],
-        single: Optional[bool],
-    ) -> List[PipelineStepReference[PipelineStep[TExecutionContext]]]:
+    def filter_steps(pipeline_config: PipelineConfig, step_names: Optional[List[str]], single: bool) -> PipelineConfig:
+        """
+        Filters the pipeline steps based on the provided step names.
+
+        If no step names are provided, all steps are returned.
+        When `single` is True, only the named steps are returned, otherwise all steps up to the last named step are returned.
+        """
         if not step_names:
-            return steps_references
+            return pipeline_config
 
         step_names_set = set(step_names)
-        filtered_steps = []
-        found_steps = set()
+        filtered_groups: List[Tuple[Optional[str], List[PipelineStepConfig]]] = []
+        found_steps: set[str] = set()
 
-        if single:
-            # Include only the explicitly named steps, preserving order
-            filtered_steps = [step for step in steps_references if step.name in step_names_set]
-            found_steps = {step.name for step in filtered_steps}
-        else:
-            # Include all steps until the last explicitly named step is found
-            for step in steps_references:
-                filtered_steps.append(step)
-                if step.name in step_names_set:
-                    found_steps.add(step.name)
-                    if found_steps == step_names_set:
-                        # Once all named steps have been found, stop here
-                        break
-            else:
-                # If loop completes without finding all named steps
-                missing_steps = step_names_set - found_steps
-                raise UserNotificationException(f"Steps not found in pipeline configuration: {', '.join(missing_steps)}")
+        for group_name, steps_config in PipelineConfigIterator(pipeline_config):
+            filtered_steps = PipelineScheduler._filter_steps_in_group(steps_config, step_names_set, single, found_steps)
+
+            if filtered_steps:
+                filtered_groups.append((group_name, filtered_steps))
+
+            if not single and found_steps == step_names_set:
+                break
 
         missing_steps = step_names_set - found_steps
         if missing_steps:
             raise UserNotificationException(f"Steps not found in pipeline configuration: {', '.join(missing_steps)}")
 
+        return PipelineScheduler._create_pipeline_config_from_groups(filtered_groups)
+
+    @staticmethod
+    def _filter_steps_in_group(steps_config: List[PipelineStepConfig], step_names_set: set[str], single: bool, found_steps: set[str]) -> List[PipelineStepConfig]:
+        """Filter steps within a single group."""
+        filtered_steps = []
+
+        for step_config in steps_config:
+            step_name = step_config.class_name or step_config.step
+
+            if single:
+                if step_name in step_names_set:
+                    filtered_steps.append(step_config)
+                    found_steps.add(step_name)
+            else:
+                filtered_steps.append(step_config)
+                if step_name in step_names_set:
+                    found_steps.add(step_name)
+                    if found_steps == step_names_set:
+                        break
+
         return filtered_steps
+
+    @staticmethod
+    def _create_pipeline_config_from_groups(groups: List[Tuple[Optional[str], List[PipelineStepConfig]]]) -> PipelineConfig:
+        """Create a PipelineConfig from filtered groups."""
+        if not groups:
+            return []
+
+        # If all groups have None as group_name, return a simple list
+        if all(group_name is None for group_name, _ in groups):
+            return [step for _, steps in groups for step in steps]
+
+        # Otherwise, return an OrderedDict
+        result: OrderedDict[str, List[PipelineStepConfig]] = OrderedDict()
+        for group_name, steps in groups:
+            if group_name is not None:
+                result[group_name] = steps
+
+        return result
 
     @staticmethod
     def create_pipeline_loader(pipeline: PipelineConfig, project_root_dir: Path) -> PipelineLoader[PipelineStep[TExecutionContext]]:

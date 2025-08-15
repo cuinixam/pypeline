@@ -1,6 +1,6 @@
 import textwrap
 from pathlib import Path
-from typing import List, Type, cast
+from typing import List, OrderedDict, Type, cast
 from unittest.mock import Mock
 
 import pytest
@@ -9,7 +9,7 @@ from py_app_dev.core.exceptions import UserNotificationException
 from pypeline.domain.artifacts import ProjectArtifactsLocator
 from pypeline.domain.config import ProjectConfig
 from pypeline.domain.execution_context import ExecutionContext
-from pypeline.domain.pipeline import PipelineConfig, PipelineStep, PipelineStepReference
+from pypeline.domain.pipeline import PipelineConfig, PipelineStep, PipelineStepConfig, PipelineStepReference
 from pypeline.pypeline import PipelineScheduler, PipelineStepsExecutor, RunCommandClassFactory
 
 from .utils import assert_element_of_type
@@ -51,6 +51,27 @@ def test_pipeline_loader_without_groups(project: Path) -> None:
     assert [step_ref.name for step_ref in steps_references] == ["MyStep", "ScoopInstall", "Echo"]
     assert steps_references[0].config == {"input": "value"}
     assert steps_references[1].config is None
+
+
+def test_pipeline_only_load_the_step_to_be_executed(project: Path) -> None:
+    # Create pypeline configuration without groups
+    pypeline_config = project / "pypeline.yaml"
+    pypeline_config.write_text(
+        textwrap.dedent(
+            """\
+            pipeline:
+                - step: MyStep
+                  file: my_python_file.py
+                  config:
+                    input: value
+                - step: IDoNotExist
+                  module: do.not.exist
+            """
+        )
+    )
+    pipeline_config = ProjectConfig.from_file(ProjectArtifactsLocator(project).config_file).pipeline
+    steps_to_run = PipelineScheduler[ExecutionContext](pipeline_config, project).get_steps_to_run(["MyStep"], single=True)
+    assert [step.name for step in steps_to_run] == ["MyStep"]
 
 
 def test_pipeline_loader_run_command(tmp_path: Path) -> None:
@@ -232,3 +253,94 @@ def test_pipeline_exchange_information_between_steps(project: Path) -> None:
     executor.run()
     my_data = [entry for entries in execution_context.data_registry._registry.values() for entry in entries if entry.provider_name == "MyStep"]
     assert len(my_data) == 1, "MyData shall be inserted in the data registry"
+
+
+@pytest.fixture
+def sample_steps() -> List[PipelineStepConfig]:
+    """Sample pipeline steps for testing."""
+    return [
+        PipelineStepConfig(step="Step1", module="test.module"),
+        PipelineStepConfig(step="Step2", module="test.module"),
+        PipelineStepConfig(step="Step3", module="test.module"),
+        PipelineStepConfig(step="Step4", module="test.module"),
+    ]
+
+
+@pytest.mark.parametrize(
+    "step_names, single, expected_steps",
+    [
+        (["Step1"], True, ["Step1"]),
+        (["Step2"], True, ["Step2"]),
+        (["Step1", "Step3"], True, ["Step1", "Step3"]),
+        (["Step1"], False, ["Step1"]),
+        (["Step2"], False, ["Step1", "Step2"]),
+    ],
+)
+def test_filter_steps(sample_steps: List[PipelineStepConfig], step_names: List[str], single: bool, expected_steps: List[str]) -> None:
+    result = cast(List[PipelineStepConfig], PipelineScheduler.filter_steps(sample_steps, step_names, single))
+    assert len(result) == len(expected_steps)
+    assert [step.step for step in result] == expected_steps
+
+
+@pytest.fixture
+def sample_ordered_dict_config() -> OrderedDict[str, List[PipelineStepConfig]]:
+    """Sample OrderedDict pipeline configuration for testing."""
+    return OrderedDict(
+        [
+            (
+                "group1",
+                [
+                    PipelineStepConfig(step="Step1", module="test.module"),
+                    PipelineStepConfig(step="Step2", module="test.module"),
+                ],
+            ),
+            (
+                "group2",
+                [
+                    PipelineStepConfig(step="Step3", module="test.module"),
+                    PipelineStepConfig(step="Step4", module="test.module"),
+                ],
+            ),
+        ]
+    )
+
+
+def test_filter_steps_with_group(sample_ordered_dict_config: OrderedDict[str, List[PipelineStepConfig]]) -> None:
+    result = cast(OrderedDict[str, List[PipelineStepConfig]], PipelineScheduler.filter_steps(sample_ordered_dict_config, ["Step2"], True))
+    assert result == OrderedDict(
+        [
+            (
+                "group1",
+                [
+                    PipelineStepConfig(step="Step2", module="test.module"),
+                ],
+            )
+        ]
+    )
+
+
+def test_filter_multiple_steps_with_group(sample_ordered_dict_config: OrderedDict[str, List[PipelineStepConfig]]) -> None:
+    result = cast(OrderedDict[str, List[PipelineStepConfig]], PipelineScheduler.filter_steps(sample_ordered_dict_config, ["Step2", "Step3"], True))
+    assert result == OrderedDict(
+        [
+            (
+                "group1",
+                [
+                    PipelineStepConfig(step="Step2", module="test.module"),
+                ],
+            ),
+            (
+                "group2",
+                [
+                    PipelineStepConfig(step="Step3", module="test.module"),
+                ],
+            ),
+        ]
+    )
+
+
+def test_filter_steps_missing_step_raises_exception(sample_steps: List[PipelineStepConfig]) -> None:
+    with pytest.raises(UserNotificationException) as exc_info:
+        PipelineScheduler.filter_steps(sample_steps[:2], ["MissingStep"], True)
+
+    assert "Steps not found in pipeline configuration: MissingStep" in str(exc_info.value)
