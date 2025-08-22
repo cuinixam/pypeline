@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.19.1 (2025-08-22)
+
+### Bug Fixes
+
+- .env variables are not available for subsequent steps
+  ([`2b8d768`](https://github.com/cuinixam/pypeline/commit/2b8d768a0c5f74a4a70a0e830236e375452f6ca8))
+
+
 ## v1.19.0 (2025-08-15)
 
 ### Features
