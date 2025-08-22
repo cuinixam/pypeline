@@ -34,6 +34,8 @@ class GenerateEnvSetupScript(PipelineStep[ExecutionContext]):
 
         # Merge execution context environment variables
         env_vars.update(self.execution_context.env_vars)
+        # Update the execution context with the merged environment variables to ensure they are available for subsequent steps
+        self.execution_context.env_vars.update(env_vars)
 
         # Generate the environment setup scripts
         BatEnvSetupScriptGenerator(

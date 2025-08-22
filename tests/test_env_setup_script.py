@@ -36,6 +36,12 @@ def test_setup_env_script(execution_context: Mock) -> None:
 
     generator = GenerateEnvSetupScript(execution_context, execution_context.project_root_dir)
     generator.run()
+    # Check that the execution context has the expected environment variables
+    assert execution_context.env_vars == {
+        "KEY1": "value1",
+        "KEY2": "",
+        "KEY3": "value1",
+    }
     # Check if the generated script files exist
     for script_name in ["env_setup.bat", "env_setup.ps1"]:
         script_file = generator.output_dir / script_name
