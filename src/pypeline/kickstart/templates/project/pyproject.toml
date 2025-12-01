@@ -9,5 +9,5 @@ requires-python = "<4.0,>=3.10"
 dependencies = [
     "pypeline-runner>=1,<2",
     "west>=1,<2",
-    "wrapt>=1,<2",
+    "wrapt>=2,<3",
 ]
