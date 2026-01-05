@@ -1,11 +1,15 @@
+import io
+import json
 import re
 import sys
+import traceback
 from dataclasses import dataclass
 from enum import Enum, auto
 from pathlib import Path
 from typing import Any, ClassVar, Dict, List, Optional
 
 from mashumaro import DataClassDictMixin
+from mashumaro.mixins.json import DataClassJSONMixin
 from py_app_dev.core.exceptions import UserNotificationException
 from py_app_dev.core.logging import logger
 
@@ -26,6 +30,21 @@ class CreateVEnvConfig(DataClassDictMixin):
 class BootstrapScriptType(Enum):
     CUSTOM = auto()
     INTERNAL = auto()
+
+
+@dataclass
+class CreateVEnvDeps(DataClassJSONMixin):
+    outputs: List[Path]
+
+    @classmethod
+    def from_json_file(cls, file_path: Path) -> "CreateVEnvDeps":
+        try:
+            result = cls.from_dict(json.loads(file_path.read_text()))
+        except Exception as e:
+            output = io.StringIO()
+            traceback.print_exc(file=output)
+            raise UserNotificationException(output.getvalue()) from e
+        return result
 
 
 class CreateVEnv(PipelineStep[ExecutionContext]):
@@ -49,6 +68,11 @@ class CreateVEnv(PipelineStep[ExecutionContext]):
 
     @property
     def install_dirs(self) -> List[Path]:
+        deps_file = self.project_root_dir / ".venv" / "create-virtual-environment.deps.json"
+        if deps_file.exists():
+            deps = CreateVEnvDeps.from_json_file(deps_file)
+            if deps.outputs:
+                return deps.outputs
         return [self.project_root_dir / dir for dir in [".venv/Scripts", ".venv/bin"] if (self.project_root_dir / dir).exists()]
 
     @property
