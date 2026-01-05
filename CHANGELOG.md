@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.20.0 (2026-01-05)
+
+### Features
+
+- Read venv installed dirs if available
+  ([`b6e7ca0`](https://github.com/cuinixam/pypeline/commit/b6e7ca08f6cb56e854b90d385a47452947fedb52))
+
+
 ## v1.19.1 (2025-08-22)
 
 ### Bug Fixes
