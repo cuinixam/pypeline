@@ -191,7 +191,7 @@ class CreateVEnv(PipelineStep[ExecutionContext]):
 
     @property
     def bootstrap_config_file(self) -> Path:
-        return self.project_root_dir / "bootstrap.json"
+        return self.project_root_dir / ".bootstrap/bootstrap.json"
 
     def get_name(self) -> str:
         return self.__class__.__name__
@@ -233,6 +233,7 @@ class CreateVEnv(PipelineStep[ExecutionContext]):
 
             # Write bootstrap.json if any configuration is provided
             if bootstrap_config:
+                self.bootstrap_config_file.parent.mkdir(exist_ok=True)
                 self.bootstrap_config_file.write_text(json.dumps(bootstrap_config, indent=2))
                 self.logger.info(f"Created bootstrap configuration at {self.bootstrap_config_file}")
 

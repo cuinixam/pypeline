@@ -146,3 +146,17 @@ def test_python_executable_property_version_not_found(execution_context: Mock) -
     with patch("shutil.which", return_value=None):
         with pytest.raises(UserNotificationException, match=r"Could not find Python 3\.99"):
             _ = create_venv.python_executable
+
+
+def test_bootstrap_config_file_in_bootstrap_directory(execution_context: Mock) -> None:
+    config = {"package_manager": "uv>=0.6"}
+    create_venv = CreateVEnv(execution_context, "group_name", config)
+    create_venv.run()
+
+    # Check that bootstrap.json is in .bootstrap directory
+    bootstrap_config_file = execution_context.project_root_dir / ".bootstrap" / "bootstrap.json"
+    assert bootstrap_config_file.exists()
+
+    # Ensure it's not in the project root
+    root_bootstrap_file = execution_context.project_root_dir / "bootstrap.json"
+    assert not root_bootstrap_file.exists()
