@@ -1,6 +1,20 @@
 # CHANGELOG
 
 
+## v1.21.0 (2026-01-13)
+
+### Features
+
+- Create env step finds python executable based on python version config
+  ([`4c49076`](https://github.com/cuinixam/pypeline/commit/4c4907681ac069bcb3c3b605c072823cdd4cf37d))
+
+- Scoop install does nothing for non windows platforms
+  ([`f3bddb5`](https://github.com/cuinixam/pypeline/commit/f3bddb5e80bbaf0ed2df0b4ee52eb20c0329840e))
+
+- Update bootstrap to isolate package manager
+  ([`29a9cfe`](https://github.com/cuinixam/pypeline/commit/29a9cfe2aaf54a3c14aa1ace5f08cb6af3d58cce))
+
+
 ## v1.20.0 (2026-01-05)
 
 ### Features
