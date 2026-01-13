@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.21.1 (2026-01-13)
+
+### Bug Fixes
+
+- Bootstrap.json is created in the wrong directory
+  ([`e295853`](https://github.com/cuinixam/pypeline/commit/e295853004cf40e25dba561dc13c0f5ea5ee77e2))
+
+
 ## v1.21.0 (2026-01-13)
 
 ### Features
