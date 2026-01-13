@@ -41,7 +41,7 @@ def init(
     project_dir: Path = typer.Option(Path.cwd().absolute(), help="The project directory"),  # noqa: B008
     force: bool = typer.Option(False, help="Force the initialization of the project even if the directory is not empty."),
 ) -> None:
-    KickstartProject(project_dir, force).run()
+    KickstartProject(project_dir.absolute(), force).run()
 
 
 @app.command()
@@ -61,6 +61,7 @@ def run(
         help="Provide input parameters as key=value pairs (e.g., -i name=value -i flag=true).",
     ),
 ) -> None:
+    project_dir = project_dir.absolute()
     project_slurper = ProjectSlurper(project_dir, config_file)
     if print:
         logger.info("Pipeline steps:")

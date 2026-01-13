@@ -1,6 +1,7 @@
 import io
 import json
 import re
+import shutil
 import sys
 import traceback
 from dataclasses import dataclass
@@ -69,7 +70,6 @@ class CreateVEnv(PipelineStep[ExecutionContext]):
         self.logger = logger.bind()
         self.internal_bootstrap_script = get_bootstrap_script()
         self.package_manager = self.user_config.package_manager if self.user_config.package_manager else self.DEFAULT_PACKAGE_MANAGER
-        self.python_executable = self.user_config.python_executable if self.user_config.python_executable else self.DEFAULT_PYTHON_EXECUTABLE
         self.venv_dir = self.project_root_dir / ".venv"
 
     @property
@@ -85,6 +85,84 @@ class CreateVEnv(PipelineStep[ExecutionContext]):
                 self.user_config.venv_install_command,
             ]
         )
+
+    def _find_python_executable(self, python_version: str) -> Optional[str]:
+        """
+        Find Python executable based on version string.
+
+        Supports version formats:
+        - "3.11.5" or "3.11" -> tries python3.11, python311
+        - "3" -> tries python3
+
+        Always ignores patch version. No fallbacks to generic python.
+
+        Returns the first executable found in PATH, or None if not found.
+        """
+        # Handle empty string
+        if not python_version:
+            return None
+
+        # Parse version string and extract components
+        version_parts = python_version.split(".")
+
+        if len(version_parts) == 0:
+            return None
+
+        major = version_parts[0]
+
+        # Determine candidates based on version format
+        candidates = []
+
+        if len(version_parts) >= 2:
+            # Has minor version (e.g., "3.11" or "3.11.5") - ignore patch
+            minor = version_parts[1]
+            major_minor = f"{major}.{minor}"
+            major_minor_no_dot = f"{major}{minor}"
+
+            candidates = [
+                f"python{major_minor}",  # python3.11 (Linux/Mac preference)
+                f"python{major_minor_no_dot}",  # python311 (Windows preference)
+            ]
+        else:
+            # Only major version (e.g., "3")
+            candidates = [f"python{major}"]
+
+        # Try to find each candidate in PATH
+        for candidate in candidates:
+            executable_path = shutil.which(candidate)
+            if executable_path:
+                self.logger.debug(f"Found Python executable: {executable_path} (candidate: {candidate})")
+                return candidate
+
+        # No fallback - return None if specific version not found
+        return None
+
+    @property
+    def python_executable(self) -> str:
+        """
+        Get python executable to use.
+
+        Priority:
+        1. User-specified python_executable config
+        2. Auto-detect from python_version config
+        3. Current Python interpreter (sys.executable)
+        """
+        # Priority 1: User explicitly specified executable
+        if self.user_config.python_executable:
+            return self.user_config.python_executable
+
+        # Priority 2: Auto-detect from python_version
+        if self.user_config.python_version:
+            found_executable = self._find_python_executable(self.user_config.python_version)
+            if found_executable:
+                return found_executable
+            # If version specified but not found, fail with helpful error
+            raise UserNotificationException(
+                f"Could not find Python {self.user_config.python_version} in PATH. Please install Python {self.user_config.python_version} or specify python_executable explicitly."
+            )
+
+        # Priority 3: Use current interpreter
+        return sys.executable
 
     @property
     def install_dirs(self) -> List[Path]:

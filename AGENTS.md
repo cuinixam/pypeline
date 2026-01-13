@@ -183,6 +183,17 @@ pypeline run -i param=value             # Pass input parameters
 - tests: use `pytest`; keep the tests to a minimum; use parametrized tests when possible; do no add useless comments; the tests shall be self-explanatory.
 - pytest fixtures: use them to avoid code duplication; use `conftest.py` for shared fixtures. Use `tmp_path` in case of file system operations.
 
+## Code Quality Rules
+
+> [!IMPORTANT]
+> **Follow these professional coding standards in all code.**
+
+1. **Import Placement**: ALL imports MUST be at the top of the file
+   - NEVER import modules inside functions or methods
+   - Group imports: standard library, third-party, local
+   - Use alphabetical ordering within groups
+   - This is basic professional Python development
+
 ## Non-Negotiable Development Rules
 
 > [!CAUTION]
