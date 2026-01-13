@@ -1,5 +1,6 @@
 import io
 import json
+import platform
 import traceback
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -69,6 +70,12 @@ class ScoopInstall(PipelineStep[ExecutionContext]):
 
     def run(self) -> int:
         self.logger.debug(f"Run {self.get_name()} step. Output dir: {self.output_dir}")
+
+        if platform.system() != "Windows":
+            self.logger.warning(f"ScoopInstall skipped on non-Windows platform ({platform.system()}).")
+            self.execution_info.to_json_file(self.execution_info_file)
+            return 0
+
         installed_apps = create_scoop_wrapper().install(self.scoop_file)
         self.logger.debug("Installed apps:")
         for app in installed_apps:

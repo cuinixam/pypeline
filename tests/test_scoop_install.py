@@ -29,9 +29,10 @@ def test_scoop_install(execution_context: Mock) -> None:
     ]
 
     # Patch the create_scoop_wrapper to return the mock_scoop_wrapper
-    with patch("pypeline.steps.scoop_install.create_scoop_wrapper", return_value=mock_scoop_wrapper):
-        scoop_install = ScoopInstall(execution_context, execution_context.project_root_dir)
-        scoop_install.run()
+    with patch("pypeline.steps.scoop_install.platform.system", return_value="Windows"):
+        with patch("pypeline.steps.scoop_install.create_scoop_wrapper", return_value=mock_scoop_wrapper):
+            scoop_install = ScoopInstall(execution_context, execution_context.project_root_dir)
+            scoop_install.run()
 
     assert len(scoop_install.get_inputs()) == 2, "Two inputs are expected: scoopfile.json and the package __init__.py"
     mock_scoop_wrapper.install.assert_called_once_with(scoop_file_json)
@@ -49,3 +50,33 @@ def test_scoop_install(execution_context: Mock) -> None:
 
     # Verify that environment variables were added to the execution context
     execution_context.add_env_vars.assert_called_once_with(expected_env_vars)
+
+
+def test_scoop_install_non_windows(execution_context: Mock) -> None:
+    # Setup
+    scoop_file_json = execution_context.project_root_dir.joinpath("scoopfile.json")
+    scoop_file_json.write_text("")
+
+    # Patch platform.system to return "Linux"
+    with patch("pypeline.steps.scoop_install.platform.system", return_value="Linux"):
+        scoop_install = ScoopInstall(execution_context, execution_context.project_root_dir)
+        result = scoop_install.run()
+
+        # Verify result is 0 (Success)
+        assert result == 0
+
+    # Verify execution info file exists and is empty
+    execution_info_file = execution_context.project_root_dir.joinpath("scoop_install_exec_info.json")
+    assert execution_info_file.exists(), "Execution info file shall exist"
+
+    execution_info = json.loads(execution_info_file.read_text())
+    assert execution_info["install_dirs"] == []
+    assert execution_info.get("env_vars", {}) == {}
+
+    # Verify update_execution_context
+    scoop_install.update_execution_context()
+
+    # Should add empty list
+    execution_context.add_install_dirs.assert_called_with([])
+    # Should not call add_env_vars, or call with empty
+    execution_context.add_env_vars.assert_not_called()
