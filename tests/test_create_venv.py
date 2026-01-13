@@ -36,8 +36,6 @@ def test_create_venv_with_internal_script(execution_context: Mock) -> None:
             Path(execution_context.project_root_dir).joinpath(".bootstrap/bootstrap.py").as_posix(),
             "--project-dir",
             Path(execution_context.project_root_dir).as_posix(),
-            "--package-manager",
-            '"uv>=0.6"',
         ],
         cwd=execution_context.project_root_dir,
     )

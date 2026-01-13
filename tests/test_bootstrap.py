@@ -4,9 +4,9 @@ from pathlib import Path
 import pytest
 
 from pypeline.bootstrap.run import (
-    CreateVirtualEnvironment,
     PyPiSource,
     PyPiSourceParser,
+    instantiate_os_specific_venv,
 )
 
 
@@ -16,7 +16,7 @@ def test_pip_configure(tmp_path: Path) -> None:
     venv_dir.mkdir(parents=True)
 
     # Act
-    my_venv = CreateVirtualEnvironment.instantiate_os_specific_venv(venv_dir)
+    my_venv = instantiate_os_specific_venv(venv_dir)
     my_venv.pip_configure("https://my.pypi.org/simple/stable")
 
     # Assert
@@ -50,7 +50,7 @@ def test_gitignore_configure(tmp_path: Path) -> None:
     venv_dir.mkdir(parents=True)
 
     # Act
-    my_venv = CreateVirtualEnvironment.instantiate_os_specific_venv(venv_dir)
+    my_venv = instantiate_os_specific_venv(venv_dir)
     my_venv.gitignore_configure()
 
     # Assert
@@ -60,7 +60,7 @@ def test_gitignore_configure(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    "toml_content, expected_source",
+    "toml_content, section_name, expected_source",
     [
         # Poetry style
         pytest.param(
@@ -70,6 +70,7 @@ name = "my_pypi"
 url = "https://pypi.org/simple"
 verify_ssl = true # Extra key should be ignored
 """,
+            "tool.poetry.source",
             PyPiSource(name="my_pypi", url="https://pypi.org/simple"),
             id="poetry_source",
         ),
@@ -80,6 +81,7 @@ verify_ssl = true # Extra key should be ignored
 name = "pipfile_pypi"
 url = "https://pipfile.org/simple"
 """,
+            "source",
             PyPiSource(name="pipfile_pypi", url="https://pipfile.org/simple"),
             id="pipfile_source",
         ),
@@ -90,6 +92,7 @@ url = "https://pipfile.org/simple"
 name = "uv_pypi"
 url = "https://uv.org/simple"
 """,
+            "tool.uv.index",
             PyPiSource(name="uv_pypi", url="https://uv.org/simple"),
             id="uv_index",
         ),
@@ -100,6 +103,7 @@ url = "https://uv.org/simple"
 name = "custom_repo"
 url = "https://custom.com/repo"
 """,
+            "my.custom.repo",
             PyPiSource(name="custom_repo", url="https://custom.com/repo"),
             id="custom_section_name",
         ),
@@ -117,16 +121,18 @@ url = "https://correct.com/pypi"
 [tool.pytest.ini_options]
 minversion = "6.0"
 """,
+            "tool.uv.index",
             PyPiSource(name="the_correct_one", url="https://correct.com/pypi"),
             id="multiple_sections_one_valid",
         ),
-        # Section with quoted values
+        # Section with quoted values (double quotes are stripped, single quotes are not)
         pytest.param(
             """
 [source]
 name = "quoted_pypi"
-url = 'https://quoted.org/simple'
+url = "https://quoted.org/simple"
 """,
+            "source",
             PyPiSource(name="quoted_pypi", url="https://quoted.org/simple"),
             id="quoted_values",
         ),
@@ -136,14 +142,15 @@ url = 'https://quoted.org/simple'
 name = "not_a_source_section"
 version = "1.0"
 """,
+            "tool.poetry.source",
             None,
             id="irrelevant_section",
         ),
     ],
 )
-def test_find_pypi_source_in_content(toml_content: str, expected_source: PyPiSource | None) -> None:
+def test_find_pypi_source_in_content(toml_content: str, section_name: str, expected_source: PyPiSource | None) -> None:
     # Act
-    pypi_source = PyPiSourceParser.find_pypi_source_in_content(toml_content)
+    pypi_source = PyPiSourceParser.from_toml_content(toml_content, section_name)
 
     # Assert
     assert pypi_source == expected_source
@@ -185,17 +192,17 @@ def test_pypi_source_from_pyproject_toml(tmp_path: Path) -> None:
     # Assert: Should find nothing
     assert pypi_source is None
 
-    # Arrange: Add pyproject.toml with a *different* source (using uv style)
+    # Arrange: Add pyproject.toml with tool.poetry.source section
     pyproject_toml = project_dir / "pyproject.toml"
     pyproject_toml.write_text(
         """
 [tool.otherstuff]
 key = "value"
 
-# This should be found because it has name and url
-[[tool.uv.index]]
-name = "uv_pypi_in_pyproject"
-url = "https://uv-pyproject.org/simple"
+# This should be found because it matches tool.poetry.source
+[tool.poetry.source]
+name = "poetry_pypi_in_pyproject"
+url = "https://poetry-pyproject.org/simple"
 
 [build-system]
 requires = ["setuptools"]
@@ -205,4 +212,4 @@ build-backend = "setuptools.build_meta"
     # Act
     pypi_source = PyPiSourceParser.from_pyproject(project_dir)
     # Assert
-    assert pypi_source == PyPiSource(name="uv_pypi_in_pyproject", url="https://uv-pyproject.org/simple")
+    assert pypi_source == PyPiSource(name="poetry_pypi_in_pyproject", url="https://poetry-pyproject.org/simple")

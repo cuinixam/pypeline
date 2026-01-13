@@ -182,3 +182,51 @@ pypeline run -i param=value             # Pass input parameters
 - Testability: pure functions where possible; pass dependencies, avoid globals/singletons.
 - tests: use `pytest`; keep the tests to a minimum; use parametrized tests when possible; do no add useless comments; the tests shall be self-explanatory.
 - pytest fixtures: use them to avoid code duplication; use `conftest.py` for shared fixtures. Use `tmp_path` in case of file system operations.
+
+## Non-Negotiable Development Rules
+
+> [!CAUTION]
+> **These rules MUST be followed for all code changes. No exceptions.**
+
+### Test-First Development
+
+1. **Write Tests Before Implementation**: For any new functionality or bug fix:
+   - Write a **meaningful test** that demonstrates the desired behavior or exposes the bug
+   - Then implement the code to make the test pass
+   - Tests should be **self-explanatory** - clear test names and minimal comments
+
+2. **Quality Over Quantity**:
+   - **Less is better**: Write only meaningful tests that add value
+   - Avoid redundant or trivial tests that don't catch real issues
+   - Each test should verify a specific behavior or edge case
+   - Use parametrized tests to cover multiple scenarios efficiently
+
+3. **Test Coverage Philosophy**:
+   - Focus on testing **behavior**, not implementation details
+   - Critical paths and business logic MUST have tests
+   - Trivial getters/setters don't need tests
+   - Integration tests for step classes and pipeline interactions
+
+### Validation Requirements
+
+4. **Run Full Pipeline**: After making changes, **ALWAYS** run:
+   ```bash
+   pypeline run
+   ```
+   This executes:
+   - Virtual environment setup
+   - Pre-commit hooks (linting, type checking)
+   - All tests
+   - Code quality checks
+
+5. **Pre-Commit Compliance**: Code MUST pass all pre-commit checks:
+   - `ruff` (linting)
+   - `mypy` (type checking)
+   - `codespell` (spelling)
+   - All other configured hooks
+
+6. **No Shortcuts**: Do not commit code that:
+   - Bypasses tests
+   - Fails linting or type checking
+   - Breaks existing functionality
+   - Lacks test coverage for critical functionality
