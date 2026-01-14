@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.22.0 (2026-01-14)
+
+### Features
+
+- Add option to override the python version from command line
+  ([`3868760`](https://github.com/cuinixam/pypeline/commit/386876093c1ec3af91739e72579a544e3709df66))
+
+
 ## v1.21.1 (2026-01-13)
 
 ### Bug Fixes
