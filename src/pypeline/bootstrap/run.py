@@ -692,22 +692,27 @@ class CreateVirtualEnvironment(Runnable):
         return "create-virtual-environment"
 
     def get_inputs(self) -> List[Path]:
-        venv_relevant_files = [
-            "uv.lock",
-            "poetry.lock",
-            "poetry.toml",
-            "pyproject.toml",
-            ".env",
-            "Pipfile",
-            "Pipfile.lock",
-            "bootstrap.json",
-            ".bootstrap/bootstrap.ps1",
-            ".bootstrap/bootstrap.py",
-            "bootstrap.ps1",
-            "bootstrap.py",
-            str(self.bootstrap_env.marker_file),
-        ]
-        return [self.root_dir / file for file in venv_relevant_files]
+        """Get input dependencies based on package manager and actual bootstrap configuration."""
+        inputs = []
+
+        # Add package manager specific lock/config files
+        package_manager_files = {
+            "uv": ["uv.lock", "pyproject.toml"],
+            "poetry": ["poetry.lock", "poetry.toml", "pyproject.toml"],
+            "pipenv": ["Pipfile", "Pipfile.lock", ".env"],
+        }
+
+        if self.package_manager_name in package_manager_files:
+            for file in package_manager_files[self.package_manager_name]:
+                inputs.append(self.root_dir / file)
+
+        # Add bootstrap script (always tracked since CreateVEnv creates it)
+        inputs.append(self.bootstrap_dir / "bootstrap.py")
+
+        # Add the bootstrap environment marker
+        inputs.append(self.bootstrap_env.marker_file)
+
+        return inputs
 
     def get_outputs(self) -> List[Path]:
         """
@@ -720,6 +725,15 @@ class CreateVirtualEnvironment(Runnable):
             self.virtual_env.scripts_path(),
             self.bootstrap_env.virtual_env.scripts_path(),
         ]
+
+    def get_config(self) -> Optional[dict[str, Any]]:
+        """Return configuration that affects the project environment."""
+        return {
+            "package_manager": self.config.package_manager,
+            "package_manager_args": self.config.package_manager_args,
+            "venv_install_command": self.config.venv_install_command,
+            "python_version": self.config.python_version,
+        }
 
 
 def print_environment_info() -> None:

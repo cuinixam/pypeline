@@ -16,9 +16,8 @@ from py_app_dev.core.logging import logger
 
 from pypeline import __version__
 from pypeline.bootstrap.run import get_bootstrap_script
-
-from ..domain.execution_context import ExecutionContext
-from ..domain.pipeline import PipelineStep
+from pypeline.domain.execution_context import ExecutionContext
+from pypeline.domain.pipeline import PipelineStep
 
 
 @dataclass
@@ -143,15 +142,27 @@ class CreateVEnv(PipelineStep[ExecutionContext]):
         Get python executable to use.
 
         Priority:
-        1. User-specified python_executable config
-        2. Auto-detect from python_version config
-        3. Current Python interpreter (sys.executable)
+        1. Input from execution context (execution_context.get_input("python_version"))
+        2. User-specified python_executable config
+        3. Auto-detect from python_version config
+        4. Current Python interpreter (sys.executable)
         """
-        # Priority 1: User explicitly specified executable
+        # Priority 1: Check execution context inputs first
+        input_python_version = self.execution_context.get_input("python_version")
+        if input_python_version:
+            found_executable = self._find_python_executable(input_python_version)
+            if found_executable:
+                return found_executable
+            # If version specified via input but not found, fail with helpful error
+            raise UserNotificationException(
+                f"Could not find Python {input_python_version} in PATH. Please install Python {input_python_version} or specify python_executable explicitly."
+            )
+
+        # Priority 2: User explicitly specified executable
         if self.user_config.python_executable:
             return self.user_config.python_executable
 
-        # Priority 2: Auto-detect from python_version
+        # Priority 3: Auto-detect from python_version config
         if self.user_config.python_version:
             found_executable = self._find_python_executable(self.user_config.python_version)
             if found_executable:
@@ -161,7 +172,7 @@ class CreateVEnv(PipelineStep[ExecutionContext]):
                 f"Could not find Python {self.user_config.python_version} in PATH. Please install Python {self.user_config.python_version} or specify python_executable explicitly."
             )
 
-        # Priority 3: Use current interpreter
+        # Priority 4: Use current interpreter
         return sys.executable
 
     @property
@@ -220,8 +231,14 @@ class CreateVEnv(PipelineStep[ExecutionContext]):
             bootstrap_config = {}
             if self.user_config.package_manager:
                 bootstrap_config["python_package_manager"] = self.user_config.package_manager
-            if self.user_config.python_version:
+
+            # Priority: input python_version takes precedence over config python_version
+            input_python_version = self.execution_context.get_input("python_version")
+            if input_python_version:
+                bootstrap_config["python_version"] = input_python_version
+            elif self.user_config.python_version:
                 bootstrap_config["python_version"] = self.user_config.python_version
+
             if self.user_config.package_manager_args:
                 bootstrap_config["python_package_manager_args"] = self.user_config.package_manager_args
             if self.user_config.bootstrap_packages:

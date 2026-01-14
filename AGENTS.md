@@ -130,11 +130,11 @@ Tests use `conftest.py` fixtures for consistent setup:
 
 ### Running Tasks
 
-Use VS Code tasks or Poetry commands:
+Use VS Code tasks or Python commands:
 
-- **Tests**: `.venv/bin/poetry run pytest --cov` (Task: "run tests")
-- **Pre-commit**: `.venv/bin/poetry run pre-commit run --all-files` (Task: "run pre-commit checks")
-- **Docs**: `.venv/bin/poetry run sphinx-build -E -a docs docs/_build` (Task: "generate docs")
+- **Tests**: `.venv/bin/python -m pytest --cov` (Task: "run tests")
+- **Pre-commit**: `.venv/bin/python -m pre-commit run --all-files` (Task: "run pre-commit checks")
+- **Docs**: `.venv/bin/python -m sphinx-build -E -a docs docs/_build` (Task: "generate docs")
 
 ### CLI Usage Patterns
 

@@ -160,3 +160,86 @@ def test_bootstrap_config_file_in_bootstrap_directory(execution_context: Mock) -
     # Ensure it's not in the project root
     root_bootstrap_file = execution_context.project_root_dir / "bootstrap.json"
     assert not root_bootstrap_file.exists()
+
+
+@pytest.mark.parametrize(
+    "input_python_version, available_executables, expected_result",
+    [
+        # Input python_version takes highest priority
+        ("3.10", ["python3.10"], "python3.10"),
+        ("3.13", ["python313"], "python313"),
+        ("3.11.5", ["python3.11"], "python3.11"),  # Ignores patch version
+    ],
+)
+def test_python_executable_from_execution_context_input(execution_context: Mock, input_python_version: str, available_executables: list[str], expected_result: str) -> None:
+    # Set python_version in execution context inputs
+    execution_context.get_input.return_value = input_python_version
+
+    # No config specified - input should take priority over sys.executable
+    create_venv = CreateVEnv(execution_context, "group_name", {})
+
+    def mock_which(candidate: str) -> str | None:
+        if candidate in available_executables:
+            return f"/usr/bin/{candidate}"
+        return None
+
+    with patch("shutil.which", side_effect=mock_which):
+        result = create_venv.python_executable
+
+    assert result == expected_result
+
+
+def test_python_executable_from_execution_context_input_not_found(execution_context: Mock) -> None:
+    # Set python_version in execution context inputs
+    execution_context.get_input.return_value = "3.99"
+
+    create_venv = CreateVEnv(execution_context, "group_name", {})
+
+    with patch("shutil.which", return_value=None):
+        with pytest.raises(UserNotificationException, match=r"Could not find Python 3\.99"):
+            _ = create_venv.python_executable
+
+
+def test_python_executable_input_overrides_config(execution_context: Mock) -> None:
+    # Input should override config python_version
+    execution_context.get_input.return_value = "3.13"
+
+    # Config specifies different version
+    config = {"python_version": "3.10"}
+    create_venv = CreateVEnv(execution_context, "group_name", config)
+
+    def mock_which(candidate: str) -> str | None:
+        if candidate == "python313":
+            return "/usr/bin/python313"
+        return None
+
+    with patch("shutil.which", side_effect=mock_which):
+        result = create_venv.python_executable
+
+    # Should use input version (3.13) not config version (3.10)
+    assert result == "python313"
+
+
+def test_python_version_input_written_to_bootstrap_config(execution_context: Mock) -> None:
+    # Set python_version in execution context inputs
+    execution_context.get_input.return_value = "3.13"
+
+    config = {"package_manager": "uv>=0.6"}
+    create_venv = CreateVEnv(execution_context, "group_name", config)
+
+    def mock_which(candidate: str) -> str | None:
+        if candidate == "python313":
+            return "/usr/bin/python313"
+        return None
+
+    with patch("shutil.which", side_effect=mock_which):
+        create_venv.run()
+
+    # Check that bootstrap.json contains the input python_version
+    bootstrap_config_file = execution_context.project_root_dir / ".bootstrap" / "bootstrap.json"
+    assert bootstrap_config_file.exists()
+
+    import json
+
+    bootstrap_config = json.loads(bootstrap_config_file.read_text())
+    assert bootstrap_config["python_version"] == "3.13"

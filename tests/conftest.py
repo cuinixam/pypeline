@@ -87,4 +87,6 @@ def execution_context(project: Path) -> Mock:
     execution_context = Mock(spec=ExecutionContext)
     execution_context.project_root_dir = project
     execution_context.create_artifacts_locator.return_value = ProjectArtifactsLocator(project)
+    # Configure get_input to return None by default (tests can override this)
+    execution_context.get_input.return_value = None
     return execution_context
