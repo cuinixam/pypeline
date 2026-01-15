@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.23.1 (2026-01-15)
+
+### Bug Fixes
+
+- Uv package manager ignores python version
+  ([`c0a0076`](https://github.com/cuinixam/pypeline/commit/c0a007645c60359c01c0178f9d0fc2a85aca7832))
+
+
 ## v1.23.0 (2026-01-15)
 
 ### Features
