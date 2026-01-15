@@ -1,6 +1,19 @@
 # CHANGELOG
 
 
+## v1.23.0 (2026-01-15)
+
+### Features
+
+- Fallback to generic `python` with version verification
+  ([`00cd443`](https://github.com/cuinixam/pypeline/commit/00cd4435d6c032293e49372a582d8556f31b2763))
+
+Fixes #7
+
+- Generate platform specific env setup scripts
+  ([`afe8b24`](https://github.com/cuinixam/pypeline/commit/afe8b240e8815c059fa9cdf5da89ded19a58347f))
+
+
 ## v1.22.0 (2026-01-14)
 
 ### Features
