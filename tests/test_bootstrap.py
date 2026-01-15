@@ -1,9 +1,13 @@
 import sys
 from pathlib import Path
+from unittest.mock import Mock, call, patch
 
 import pytest
 
 from pypeline.bootstrap.run import (
+    BootstrapConfig,
+    CreateBootstrapEnvironment,
+    CreateVirtualEnvironment,
     PyPiSource,
     PyPiSourceParser,
     instantiate_os_specific_venv,
@@ -213,3 +217,68 @@ build-backend = "setuptools.build_meta"
     pypi_source = PyPiSourceParser.from_pyproject(project_dir)
     # Assert
     assert pypi_source == PyPiSource(name="poetry_pypi_in_pyproject", url="https://poetry-pyproject.org/simple")
+
+
+@pytest.mark.parametrize(
+    "package_manager, python_version, expected_calls",
+    [
+        pytest.param(
+            "uv>=0.6",
+            "3.13",
+            [
+                ("UV_PYTHON", "3.13"),
+                ("UV_MANAGED_PYTHON", "false"),
+                ("UV_NO_PYTHON_DOWNLOADS", "true"),
+            ],
+            id="uv_with_version",
+        ),
+        pytest.param(
+            "uv>=0.6",
+            "3.11.5",
+            [
+                ("UV_PYTHON", "3.11.5"),
+                ("UV_MANAGED_PYTHON", "false"),
+                ("UV_NO_PYTHON_DOWNLOADS", "true"),
+            ],
+            id="uv_with_patch_version",
+        ),
+        pytest.param(
+            "poetry>=2.0",
+            "3.13",
+            [
+                ("POETRY_VIRTUALENVS_PREFER_ACTIVE_PYTHON", "false"),
+                ("POETRY_VIRTUALENVS_USE_POETRY_PYTHON", "true"),
+            ],
+            id="poetry_with_version",
+        ),
+    ],
+)
+def test_ensure_correct_python_version_sets_env_vars(
+    tmp_path: Path,
+    package_manager: str,
+    python_version: str,
+    expected_calls: list[tuple[str, str]],
+) -> None:
+    """Test that _ensure_correct_python_version sets the correct environment variables."""
+    # Arrange
+    project_dir = tmp_path / "project"
+    project_dir.mkdir(parents=True)
+
+    config = BootstrapConfig(
+        python_version=python_version,
+        package_manager=package_manager,
+    )
+
+    bootstrap_env = CreateBootstrapEnvironment(config, project_dir)
+    create_venv = CreateVirtualEnvironment(project_dir, bootstrap_env)
+
+    # Mock the helper method to avoid actual environment modification
+    mock_set_env = Mock()
+    with patch.object(create_venv, "_set_env_var", mock_set_env):
+        # Act
+        create_venv._ensure_correct_python_version()
+
+        # Assert: Verify _set_env_var was called with the right arguments
+        expected_call_objects = [call(key, value) for key, value in expected_calls]
+        mock_set_env.assert_has_calls(expected_call_objects)
+        assert mock_set_env.call_count == len(expected_calls)

@@ -632,22 +632,31 @@ class CreateVirtualEnvironment(Runnable):
         except OSError as exc:
             logger.warning(f"Could not write Python version marker: {exc}")
 
+    def _set_env_var(self, key: str, value: str) -> None:
+        """Helper method to set environment variables (easier to mock in tests)."""
+        os.environ[key] = value
+
     def _ensure_in_project_venv(self) -> None:
         """Configure package managers to create venv in-project (.venv in repository)."""
         if self.package_manager_name == "poetry":
             # Set environment variable for poetry to create venv in-project
-            os.environ["POETRY_VIRTUALENVS_IN_PROJECT"] = "true"
+            self._set_env_var("POETRY_VIRTUALENVS_IN_PROJECT", "true")
         elif self.package_manager_name == "pipenv":
             # Set environment variable for pipenv
-            os.environ["PIPENV_VENV_IN_PROJECT"] = "1"
+            self._set_env_var("PIPENV_VENV_IN_PROJECT", "1")
         # UV creates .venv in-project by default, no configuration needed
 
     def _ensure_correct_python_version(self) -> None:
         """Ensure the correct Python version is used in the virtual environment."""
         if self.package_manager_name == "poetry":
             # Make Poetry use the Python interpreter it's being run with
-            os.environ["POETRY_VIRTUALENVS_PREFER_ACTIVE_PYTHON"] = "false"
-            os.environ["POETRY_VIRTUALENVS_USE_POETRY_PYTHON"] = "true"
+            self._set_env_var("POETRY_VIRTUALENVS_PREFER_ACTIVE_PYTHON", "false")
+            self._set_env_var("POETRY_VIRTUALENVS_USE_POETRY_PYTHON", "true")
+        elif self.package_manager_name == "uv":
+            # Make UV use the Python interpreter it's being run with
+            self._set_env_var("UV_PYTHON", self.config.python_version)
+            self._set_env_var("UV_MANAGED_PYTHON", "false")
+            self._set_env_var("UV_NO_PYTHON_DOWNLOADS", "true")
 
     def _get_install_argument(self) -> str:
         if self.package_manager_name == "uv":
