@@ -35,7 +35,8 @@ class ShEnvSetupScriptGenerator(EnvSetupScriptGenerator):
             lines.append(f"export {key}='{escaped_value}'")
 
         if self.install_dirs:
-            path_string = ":".join([str(path) for path in self.install_dirs])
+            # Convert to POSIX paths to ensure forward slashes on all platforms
+            path_string = ":".join([path.as_posix() for path in self.install_dirs])
             # Escape single quotes in paths
             escaped_path_string = path_string.replace("'", "'\\''")
             lines.append(f"export PATH='{escaped_path_string}':\"$PATH\"")

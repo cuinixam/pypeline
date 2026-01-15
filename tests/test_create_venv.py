@@ -243,3 +243,109 @@ def test_python_version_input_written_to_bootstrap_config(execution_context: Moc
 
     bootstrap_config = json.loads(bootstrap_config_file.read_text())
     assert bootstrap_config["python_version"] == "3.13"
+
+
+@pytest.mark.parametrize(
+    "executable, expected_version, version_output, expected_result",
+    [
+        # Matching versions
+        ("python", "3.11", "Python 3.11.5", True),
+        ("python", "3.10", "Python 3.10.0", True),
+        ("python3", "3.12", "Python 3.12.1", True),
+        # Mismatched versions
+        ("python", "3.11", "Python 3.10.5", False),
+        ("python", "3.13", "Python 3.12.0", False),
+        # Different version formats
+        ("python", "3.11", "Python 3.11.5 (default, Aug  7 2024, 17:19:32)", True),
+        ("python", "3.10", "Python 3.10.12\n", True),
+        # Major version only
+        ("python3", "3", "Python 3.11.5", True),
+        ("python3", "3", "Python 3.10.0", True),
+    ],
+)
+def test_verify_python_version(execution_context: Mock, executable: str, expected_version: str, version_output: str, expected_result: bool) -> None:
+    create_venv = CreateVEnv(execution_context, "group_name", {})
+
+    mock_result = Mock()
+    mock_result.stdout = version_output
+    mock_result.returncode = 0
+
+    with patch("subprocess.run", return_value=mock_result):
+        result = create_venv._verify_python_version(executable, expected_version)
+
+    assert result == expected_result
+
+
+def test_verify_python_version_invalid_executable(execution_context: Mock) -> None:
+    create_venv = CreateVEnv(execution_context, "group_name", {})
+
+    # Simulate subprocess.run raising an exception
+    with patch("subprocess.run", side_effect=FileNotFoundError()):
+        result = create_venv._verify_python_version("nonexistent_python", "3.11")
+
+    assert result is False
+
+
+def test_verify_python_version_invalid_output(execution_context: Mock) -> None:
+    create_venv = CreateVEnv(execution_context, "group_name", {})
+
+    mock_result = Mock()
+    mock_result.stdout = "invalid output"
+    mock_result.returncode = 0
+
+    with patch("subprocess.run", return_value=mock_result):
+        result = create_venv._verify_python_version("python", "3.11")
+
+    assert result is False
+
+
+@pytest.mark.parametrize(
+    "python_version, available_executable, python_version_output, expected_result",
+    [
+        # Fallback to python when version-specific not found, version matches
+        ("3.11", "python", "Python 3.11.5", "python"),
+        ("3.10", "python", "Python 3.10.0", "python"),
+        # Fallback to python when version-specific not found, version doesn't match
+        ("3.11", "python", "Python 3.10.5", None),
+        ("3.13", "python", "Python 3.12.0", None),
+        # Version-specific executable found, should not fallback
+        ("3.11", "python3.11", "Python 3.11.5", "python3.11"),
+        ("3.10", "python310", "Python 3.10.0", "python310"),
+    ],
+)
+def test_find_python_executable_with_fallback(
+    execution_context: Mock,
+    python_version: str,
+    available_executable: str,
+    python_version_output: str,
+    expected_result: str | None,
+) -> None:
+    config = {"python_version": python_version}
+    create_venv = CreateVEnv(execution_context, "group_name", config)
+
+    def mock_which(candidate: str) -> str | None:
+        # Return path for the available executable
+        if candidate == available_executable:
+            return f"/usr/bin/{candidate}"
+        return None
+
+    mock_result = Mock()
+    mock_result.stdout = python_version_output
+    mock_result.returncode = 0
+
+    with patch("shutil.which", side_effect=mock_which):
+        with patch("subprocess.run", return_value=mock_result):
+            result = create_venv._find_python_executable(python_version)
+
+    assert result == expected_result
+
+
+def test_find_python_executable_fallback_no_python_available(execution_context: Mock) -> None:
+    config = {"python_version": "3.11"}
+    create_venv = CreateVEnv(execution_context, "group_name", config)
+
+    # No executables available
+    with patch("shutil.which", return_value=None):
+        result = create_venv._find_python_executable("3.11")
+
+    assert result is None

@@ -2,6 +2,7 @@ import io
 import json
 import re
 import shutil
+import subprocess
 import sys
 import traceback
 from dataclasses import dataclass
@@ -85,17 +86,73 @@ class CreateVEnv(PipelineStep[ExecutionContext]):
             ]
         )
 
+    def _verify_python_version(self, executable: str, expected_version: str) -> bool:
+        """
+        Verify that a Python executable matches the expected version.
+
+        Args:
+        ----
+            executable: Name or path of Python executable to check
+            expected_version: Expected version string (e.g., "3.11" or "3.11.5")
+
+        Returns:
+        -------
+            True if the executable's version matches expected_version (ignoring patch),
+            False otherwise or if the executable cannot be queried.
+
+        """
+        try:
+            # Run python --version to get the version string
+            result = subprocess.run(
+                [executable, "--version"],  # noqa: S603
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            if result.returncode != 0:
+                return False
+
+            # Parse version from output (e.g., "Python 3.11.5")
+            version_output = result.stdout.strip()
+            match = re.match(r"Python\s+(\d+)\.(\d+)(?:\.\d+)?", version_output)
+            if not match:
+                self.logger.warning(f"Could not parse version from: {version_output}")
+                return False
+
+            actual_major = match.group(1)
+            actual_minor = match.group(2)
+
+            # Parse expected version
+            expected_parts = expected_version.split(".")
+            if len(expected_parts) == 0:
+                return False
+
+            expected_major = expected_parts[0]
+            # If only major version specified, only compare major
+            if len(expected_parts) == 1:
+                return actual_major == expected_major
+
+            # Compare major.minor
+            expected_minor = expected_parts[1]
+            return actual_major == expected_major and actual_minor == expected_minor
+
+        except (FileNotFoundError, OSError) as e:
+            self.logger.debug(f"Failed to verify Python version for {executable}: {e}")
+            return False
+
     def _find_python_executable(self, python_version: str) -> Optional[str]:
         """
         Find Python executable based on version string.
 
         Supports version formats:
-        - "3.11.5" or "3.11" -> tries python3.11, python311
-        - "3" -> tries python3
+        - "3.11.5" or "3.11" -> tries python3.11, python311, then falls back to python
+        - "3" -> tries python3, then falls back to python
 
-        Always ignores patch version. No fallbacks to generic python.
+        Always ignores patch version. Falls back to generic 'python' if version-specific
+        executables are not found, but verifies the version matches.
 
-        Returns the first executable found in PATH, or None if not found.
+        Returns the first executable found in PATH, or None if not found or version mismatch.
         """
         # Handle empty string
         if not python_version:
@@ -133,7 +190,16 @@ class CreateVEnv(PipelineStep[ExecutionContext]):
                 self.logger.debug(f"Found Python executable: {executable_path} (candidate: {candidate})")
                 return candidate
 
-        # No fallback - return None if specific version not found
+        # Fallback to generic 'python' executable with version verification
+        self.logger.debug(f"No version-specific Python executable found for {python_version}, trying generic 'python'")
+        if shutil.which("python"):
+            if self._verify_python_version("python", python_version):
+                self.logger.info(f"Using generic 'python' executable (verified as Python {python_version})")
+                return "python"
+            else:
+                self.logger.warning(f"Generic 'python' executable found but version does not match {python_version}")
+
+        # No suitable executable found
         return None
 
     @property
