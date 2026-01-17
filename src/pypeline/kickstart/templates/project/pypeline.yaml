@@ -8,8 +8,8 @@ pipeline:
   - step: CreateVEnv
     module: pypeline.steps.create_venv
     config:
-      package_manager: uv>=0.9
       python_executable: python3
+      python_package_manager: uv>=0.9
   - step: WestInstall
     module: pypeline.steps.west_install
     description: Download external modules

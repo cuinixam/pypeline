@@ -1,3 +1,4 @@
+import json
 import sys
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -5,7 +6,7 @@ from unittest.mock import Mock, patch
 import pytest
 from py_app_dev.core.exceptions import UserNotificationException
 
-from pypeline.steps.create_venv import CreateVEnv, CreateVEnvDeps
+from pypeline.steps.create_venv import CreateVEnv, CreateVEnvConfig, CreateVEnvDeps
 
 
 @pytest.mark.parametrize("bootstrap_script", [".bootstrap/bootstrap.py", "custom_bootstrap.py"])
@@ -26,10 +27,37 @@ def test_create_venv_with_custom_script(execution_context: Mock, bootstrap_scrip
     )
 
 
-def test_create_venv_with_custom_script_not_found(execution_context: Mock) -> None:
-    create_venv = CreateVEnv(execution_context, "group_name", {"bootstrap_script": "custom_bootstrap.py"})
-    with pytest.raises(UserNotificationException):
-        create_venv.run()
+def test_create_venv_auto_creates_missing_custom_script(execution_context: Mock) -> None:
+    bootstrap_script = "custom_bootstrap.py"
+    config = {"bootstrap_script": bootstrap_script}
+    create_venv = CreateVEnv(execution_context, "group_name", config)
+
+    # Run should not raise exception now
+    create_venv.run()
+
+    # Verify script was created
+    bootstrap_path = execution_context.project_root_dir / bootstrap_script
+    assert bootstrap_path.exists()
+    # Verify content matches internal script
+    from pypeline.bootstrap.run import get_bootstrap_script
+
+    expected_content = get_bootstrap_script().read_text()
+    assert bootstrap_path.read_text() == expected_content
+
+    # Verify it was executed with FULL arguments (treated as managed script)
+    # The expected call should look like the internal script call but with the custom script path
+    execution_context.create_process_executor.assert_called_once()
+    args = execution_context.create_process_executor.call_args[0][0]
+
+    # Check basic structure: python, script, --project-dir, path
+    assert args[0] == sys.executable
+    assert args[1] == bootstrap_path.as_posix()
+    assert "--project-dir" in args
+    assert execution_context.project_root_dir.as_posix() in args
+
+    # We didn't provide any explicit config, so bootstrap.json shouldn't be created
+    # and --config shouldn't be passed (unless defaults trigger it, which they don't here)
+    assert "--config" not in args
 
 
 def test_create_venv_with_internal_script(execution_context: Mock) -> None:
@@ -149,7 +177,7 @@ def test_python_executable_property_version_not_found(execution_context: Mock) -
 
 
 def test_bootstrap_config_file_in_bootstrap_directory(execution_context: Mock) -> None:
-    config = {"package_manager": "uv>=0.6"}
+    config = {"python_package_manager": "uv>=0.6"}
     create_venv = CreateVEnv(execution_context, "group_name", config)
     create_venv.run()
 
@@ -224,7 +252,7 @@ def test_python_version_input_written_to_bootstrap_config(execution_context: Moc
     # Set python_version in execution context inputs
     execution_context.get_input.return_value = "3.13"
 
-    config = {"package_manager": "uv>=0.6"}
+    config = {"python_package_manager": "uv>=0.6"}
     create_venv = CreateVEnv(execution_context, "group_name", config)
 
     def mock_which(candidate: str) -> str | None:
@@ -349,3 +377,134 @@ def test_find_python_executable_fallback_no_python_available(execution_context: 
         result = create_venv._find_python_executable("3.11")
 
     assert result is None
+
+
+def test_get_all_properties_names_returns_all_fields() -> None:
+    config = CreateVEnvConfig()
+    assert set(config.get_all_properties_names()) == {
+        "bootstrap_script",
+        "python_executable",
+        "python_version",
+        "package_manager",
+        "python_package_manager",
+        "python_package_manager_args",
+        "bootstrap_packages",
+        "bootstrap_cache_dir",
+        "venv_install_command",
+    }
+
+
+def test_get_all_properties_names_with_exclusions() -> None:
+    config = CreateVEnvConfig()
+    excluded = ["bootstrap_script", "python_executable"]
+    properties = config.get_all_properties_names(excluded_names=excluded)
+    expected_properties = {
+        "python_version",
+        "package_manager",
+        "python_package_manager",
+        "python_package_manager_args",
+        "bootstrap_packages",
+        "bootstrap_cache_dir",
+        "venv_install_command",
+    }
+    assert set(properties) == expected_properties
+
+
+def test_is_any_property_set_returns_false_when_empty() -> None:
+    config = CreateVEnvConfig()
+    assert config.is_any_property_set() is False
+
+
+def test_is_any_property_set_returns_true_when_property_set() -> None:
+    config = CreateVEnvConfig(python_version="3.11")
+    assert config.is_any_property_set() is True
+
+
+def test_is_any_property_set_respects_exclusions() -> None:
+    config = CreateVEnvConfig(bootstrap_script="custom.py")
+    assert config.is_any_property_set() is True
+    assert config.is_any_property_set(excluded_fields=["bootstrap_script"]) is False
+
+
+def test_create_venv_config_to_json_string_omits_none_values() -> None:
+    config = CreateVEnvConfig(python_version="3.11", python_package_manager="uv>=0.6")
+    json_string = config.to_json_string()
+    parsed = json.loads(json_string)
+
+    assert parsed["python_version"] == "3.11"
+    assert parsed["python_package_manager"] == "uv>=0.6"
+    # None values should be omitted
+    assert "bootstrap_script" not in parsed
+    assert "python_executable" not in parsed
+    assert "bootstrap_packages" not in parsed
+
+
+def test_create_venv_config_migrates_deprecated_package_manager() -> None:
+    """Test that package_manager is automatically migrated to python_package_manager."""
+    config = CreateVEnvConfig(package_manager="poetry>=2.0")
+
+    assert config.python_package_manager == "poetry>=2.0"
+    assert config.package_manager is None
+
+
+def test_create_venv_config_keeps_python_package_manager_when_both_match() -> None:
+    """Test that when both fields are set with same value, migration succeeds."""
+    config = CreateVEnvConfig(package_manager="uv>=0.6", python_package_manager="uv>=0.6")
+
+    assert config.python_package_manager == "uv>=0.6"
+    assert config.package_manager is None
+
+
+def test_create_venv_config_raises_on_conflicting_package_managers() -> None:
+    """Test that conflicting package_manager values raise an exception."""
+    with pytest.raises(UserNotificationException, match="Conflicting package manager configuration"):
+        CreateVEnvConfig(package_manager="poetry>=2.0", python_package_manager="uv>=0.6")
+
+
+def test_create_venv_config_prefers_python_package_manager_when_set() -> None:
+    """Test that python_package_manager is preferred when both fields are None for package_manager."""
+    config = CreateVEnvConfig(python_package_manager="uv>=0.6")
+
+    assert config.python_package_manager == "uv>=0.6"
+    assert config.package_manager is None
+
+
+def test_create_venv_config_migration_from_json_file(tmp_path: Path) -> None:
+    """Test that deprecated package_manager field is migrated when loaded from JSON."""
+    config_file = tmp_path / "legacy_config.json"
+    # Simulate old config file with deprecated field
+    config_file.write_text('{"package_manager": "poetry>=2.0", "python_version": "3.11"}')
+
+    config = CreateVEnvConfig.from_json_file(config_file)
+
+    # Should be migrated
+    assert config.python_package_manager == "poetry>=2.0"
+    assert config.package_manager is None
+    assert config.python_version == "3.11"
+
+
+def test_create_venv_config_to_json_file(tmp_path: Path) -> None:
+    config_file = tmp_path / "test_config.json"
+    config = CreateVEnvConfig(
+        python_version="3.13",
+        python_package_manager="poetry>=2.0",
+        bootstrap_packages=["pip-system-certs>=4.0"],
+    )
+    config.to_json_file(config_file)
+
+    assert config_file.exists()
+    parsed = json.loads(config_file.read_text())
+    assert parsed["python_version"] == "3.13"
+    assert parsed["python_package_manager"] == "poetry>=2.0"
+    assert parsed["bootstrap_packages"] == ["pip-system-certs>=4.0"]
+
+
+def test_create_venv_config_from_json_file(tmp_path: Path) -> None:
+    config_file = tmp_path / "config.json"
+    config_file.write_text('{"python_version": "3.10", "python_package_manager": "uv>=0.6"}')
+
+    config = CreateVEnvConfig.from_json_file(config_file)
+
+    assert config.python_version == "3.10"
+    assert config.python_package_manager == "uv>=0.6"
+    assert config.bootstrap_script is None

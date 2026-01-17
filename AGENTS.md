@@ -107,7 +107,7 @@ pipeline:
   - step: CreateVEnv
     module: pypeline.steps.create_venv
     config:
-      package_manager: uv>=0.6
+      python_package_manager: uv>=0.6
   - step: CustomStep
     file: steps/custom.py
 ```

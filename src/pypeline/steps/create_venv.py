@@ -5,33 +5,84 @@ import shutil
 import subprocess
 import sys
 import traceback
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from enum import Enum, auto
 from pathlib import Path
 from typing import Any, ClassVar, Dict, List, Optional
 
-from mashumaro import DataClassDictMixin
+from mashumaro.config import TO_DICT_ADD_OMIT_NONE_FLAG, BaseConfig
 from mashumaro.mixins.json import DataClassJSONMixin
 from py_app_dev.core.exceptions import UserNotificationException
 from py_app_dev.core.logging import logger
 
-from pypeline import __version__
 from pypeline.bootstrap.run import get_bootstrap_script
 from pypeline.domain.execution_context import ExecutionContext
 from pypeline.domain.pipeline import PipelineStep
 
 
 @dataclass
-class CreateVEnvConfig(DataClassDictMixin):
+class CreateVEnvConfig(DataClassJSONMixin):
     bootstrap_script: Optional[str] = None
     python_executable: Optional[str] = None
-    # Bootstrap-specific configuration
-    package_manager: Optional[str] = None
     python_version: Optional[str] = None
-    package_manager_args: Optional[List[str]] = None
+    # deprecated: kept for backward compatibility
+    package_manager: Optional[str] = None
+    python_package_manager: Optional[str] = None
+    python_package_manager_args: Optional[List[str]] = None
     bootstrap_packages: Optional[List[str]] = None
     bootstrap_cache_dir: Optional[str] = None
     venv_install_command: Optional[str] = None
+
+    class Config(BaseConfig):
+        """Base configuration for JSON serialization with omitted None values."""
+
+        code_generation_options: ClassVar[List[str]] = [TO_DICT_ADD_OMIT_NONE_FLAG]
+
+    def __post_init__(self) -> None:
+        """
+        Migrate deprecated package_manager field to python_package_manager.
+
+        Ensures backward compatibility while preventing conflicting configurations.
+        """
+        # If both are set, they must match
+        if self.package_manager is not None and self.python_package_manager is not None:
+            if self.package_manager != self.python_package_manager:
+                raise UserNotificationException(
+                    f"Conflicting package manager configuration: "
+                    f"package_manager='{self.package_manager}' vs python_package_manager='{self.python_package_manager}'. "
+                    f"Please use only 'python_package_manager' (package_manager is deprecated)."
+                )
+
+        # Migrate from deprecated package_manager to python_package_manager
+        if self.package_manager is not None and self.python_package_manager is None:
+            self.python_package_manager = self.package_manager
+
+        # Clear the deprecated field after migration
+        self.package_manager = None
+
+    @classmethod
+    def from_json_file(cls, file_path: Path) -> "CreateVEnvConfig":
+        try:
+            result = cls.from_dict(json.loads(file_path.read_text()))
+        except Exception as e:
+            output = io.StringIO()
+            traceback.print_exc(file=output)
+            raise UserNotificationException(output.getvalue()) from e
+        return result
+
+    def to_json_string(self) -> str:
+        return json.dumps(self.to_dict(omit_none=True), indent=2)
+
+    def to_json_file(self, file_path: Path) -> None:
+        file_path.write_text(self.to_json_string())
+
+    def get_all_properties_names(self, excluded_names: Optional[List[str]] = None) -> List[str]:
+        if excluded_names is None:
+            excluded_names = []
+        return [field.name for field in fields(self) if field.name not in excluded_names]
+
+    def is_any_property_set(self, excluded_fields: Optional[List[str]] = None) -> bool:
+        return any(getattr(self, field) is not None for field in self.get_all_properties_names(excluded_fields))
 
 
 class BootstrapScriptType(Enum):
@@ -69,22 +120,12 @@ class CreateVEnv(PipelineStep[ExecutionContext]):
         super().__init__(execution_context, group_name, config)
         self.logger = logger.bind()
         self.internal_bootstrap_script = get_bootstrap_script()
-        self.package_manager = self.user_config.package_manager if self.user_config.package_manager else self.DEFAULT_PACKAGE_MANAGER
+        self.package_manager = self.user_config.python_package_manager if self.user_config.python_package_manager else self.DEFAULT_PACKAGE_MANAGER
         self.venv_dir = self.project_root_dir / ".venv"
 
-    @property
     def has_bootstrap_config(self) -> bool:
         """Check if user provided any bootstrap-specific configuration."""
-        return any(
-            [
-                self.user_config.package_manager,
-                self.user_config.python_version,
-                self.user_config.package_manager_args,
-                self.user_config.bootstrap_packages,
-                self.user_config.bootstrap_cache_dir,
-                self.user_config.venv_install_command,
-            ]
-        )
+        return self.user_config.is_any_property_set(["bootstrap_script", "python_executable"])
 
     def _verify_python_version(self, executable: str, expected_version: str) -> bool:
         """
@@ -275,18 +316,34 @@ class CreateVEnv(PipelineStep[ExecutionContext]):
 
     def run(self) -> int:
         self.logger.debug(f"Run {self.get_name()} step. Output dir: {self.output_dir}")
-
+        bootstrap_config: Dict[str, Any] = {}
+        is_managed = False
+        # Determine target script and mode
         if self.user_config.bootstrap_script:
-            # User provided a custom bootstrap script - run it directly
-            bootstrap_script = self.project_root_dir / self.user_config.bootstrap_script
-            if not bootstrap_script.exists():
-                raise UserNotificationException(f"Bootstrap script {bootstrap_script} does not exist.")
+            target_script = self.project_root_dir / self.user_config.bootstrap_script
+            # If script exists, it's a "Custom Mode" execution (legacy behavior: run as-is)
+            # If it misses, we enter "Managed Mode" to auto-create and run it
+            is_managed = not target_script.exists()
+            if is_managed:
+                self.logger.warning(f"Bootstrap script {target_script} does not exist. Creating it from internal default.")
+                # If there is a custom bootstrap config (bootstrap.json) in the project root,
+                # we need to provide the internal script
+                default_bootstrap_config = self.project_root_dir / "bootstrap.json"
+                if default_bootstrap_config.exists():
+                    self.logger.warning(f"Found bootstrap config {default_bootstrap_config}. Reading it.")
+                    bootstrap_config = CreateVEnvConfig.from_json_file(default_bootstrap_config)
+        else:
+            target_script = self.target_internal_bootstrap_script
+            is_managed = True
+
+        if not is_managed:
+            # Custom Mode: Run existing user script directly without injection
             self.execution_context.create_process_executor(
-                [self.python_executable, bootstrap_script.as_posix()],
+                [self.python_executable, target_script.as_posix()],
                 cwd=self.project_root_dir,
             ).execute()
         else:
-            # Use internal bootstrap script
+            # Managed Mode: Internal logic (Config generation + Args + File creation)
             skip_venv_delete = False
             python_executable = Path(sys.executable).absolute()
             if python_executable.is_relative_to(self.project_root_dir):
@@ -294,30 +351,22 @@ class CreateVEnv(PipelineStep[ExecutionContext]):
                 skip_venv_delete = True
 
             # Create bootstrap.json with all configuration
-            bootstrap_config = {}
-            if self.user_config.package_manager:
-                bootstrap_config["python_package_manager"] = self.user_config.package_manager
+            # Populate config dynamically from CreateVEnvConfig fields
+            # excluding internal/local fields like bootstrap_script/python_executable
+            for field_name in self.user_config.get_all_properties_names(["bootstrap_script", "python_executable"]):
+                val = getattr(self.user_config, field_name)
+                if val is not None:
+                    bootstrap_config[field_name] = val
 
             # Priority: input python_version takes precedence over config python_version
             input_python_version = self.execution_context.get_input("python_version")
             if input_python_version:
                 bootstrap_config["python_version"] = input_python_version
-            elif self.user_config.python_version:
-                bootstrap_config["python_version"] = self.user_config.python_version
-
-            if self.user_config.package_manager_args:
-                bootstrap_config["python_package_manager_args"] = self.user_config.package_manager_args
-            if self.user_config.bootstrap_packages:
-                bootstrap_config["bootstrap_packages"] = self.user_config.bootstrap_packages
-            if self.user_config.bootstrap_cache_dir:
-                bootstrap_config["bootstrap_cache_dir"] = self.user_config.bootstrap_cache_dir
-            if self.user_config.venv_install_command:
-                bootstrap_config["venv_install_command"] = self.user_config.venv_install_command
 
             # Write bootstrap.json if any configuration is provided
             if bootstrap_config:
                 self.bootstrap_config_file.parent.mkdir(exist_ok=True)
-                self.bootstrap_config_file.write_text(json.dumps(bootstrap_config, indent=2))
+                CreateVEnvConfig.from_dict(bootstrap_config).to_json_file(self.bootstrap_config_file)
                 self.logger.info(f"Created bootstrap configuration at {self.bootstrap_config_file}")
 
             # Build bootstrap script arguments
@@ -327,49 +376,47 @@ class CreateVEnv(PipelineStep[ExecutionContext]):
             ]
 
             # Always use --config if bootstrap.json exists
+            # Note: We use the internal .bootstrap/bootstrap.json location for consistency
             if self.bootstrap_config_file.exists():
                 bootstrap_args.extend(["--config", self.bootstrap_config_file.as_posix()])
 
             if skip_venv_delete:
                 bootstrap_args.append("--skip-venv-delete")
 
-            # Copy the internal bootstrap script to the project root .bootstrap/bootstrap.py
-            self.target_internal_bootstrap_script.parent.mkdir(exist_ok=True)
-            if not self.target_internal_bootstrap_script.exists() or self.target_internal_bootstrap_script.read_text() != self.internal_bootstrap_script.read_text():
-                self.target_internal_bootstrap_script.write_text(self.internal_bootstrap_script.read_text())
-                self.logger.warning(f"Updated bootstrap script at {self.target_internal_bootstrap_script}")
+            # Create/Update the target bootstrap script from internal template
+            target_script.parent.mkdir(parents=True, exist_ok=True)
 
-            # Run the copied bootstrap script
+            # Check if we need to write/update the file
+            # If it's a missing custom file, we definitely write.
+            # If it's the internal file, we check content hash/diff.
+            should_write = False
+            if not target_script.exists():
+                should_write = True
+            elif target_script == self.target_internal_bootstrap_script:
+                if target_script.read_text() != self.internal_bootstrap_script.read_text():
+                    should_write = True
+
+            if should_write:
+                target_script.write_text(self.internal_bootstrap_script.read_text())
+                if target_script == self.target_internal_bootstrap_script:
+                    self.logger.warning(f"Updated bootstrap script at {target_script}")
+
+            # Run the bootstrap script
             self.execution_context.create_process_executor(
-                [self.python_executable, self.target_internal_bootstrap_script.as_posix(), *bootstrap_args],
+                [self.python_executable, target_script.as_posix(), *bootstrap_args],
                 cwd=self.project_root_dir,
             ).execute()
 
         return 0
 
     def get_inputs(self) -> List[Path]:
-        package_manager_relevant_file = self.SUPPORTED_PACKAGE_MANAGERS.get(self.package_manager_name, [])
-        inputs = [self.project_root_dir / file for file in package_manager_relevant_file]
-        # Include bootstrap.json if it exists
-        if self.bootstrap_config_file.exists():
-            inputs.append(self.bootstrap_config_file)
-        return inputs
+        return []
 
     def get_outputs(self) -> List[Path]:
-        outputs = [self.venv_dir]
-        if self.bootstrap_script_type == BootstrapScriptType.INTERNAL:
-            outputs.append(self.target_internal_bootstrap_script)
-            # Include bootstrap.json if it will be created
-            if self.has_bootstrap_config:
-                outputs.append(self.bootstrap_config_file)
-        return outputs
+        return []
 
     def get_config(self) -> Optional[dict[str, str]]:
-        return {
-            "version": __version__,
-            "python_executable": self.python_executable,
-            "package_manager": self.package_manager,
-        }
+        return None
 
     def update_execution_context(self) -> None:
         self.execution_context.add_install_dirs(self.install_dirs)
