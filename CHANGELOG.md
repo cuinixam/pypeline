@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.23.2 (2026-01-17)
+
+### Bug Fixes
+
+- Venv not self updating if dependecies change
+  ([`957f52c`](https://github.com/cuinixam/pypeline/commit/957f52c757d717428cfed217592b83fbb3d6dcc8))
+
+
 ## v1.23.1 (2026-01-15)
 
 ### Bug Fixes
