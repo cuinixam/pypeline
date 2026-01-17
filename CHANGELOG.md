@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.24.0 (2026-01-17)
+
+### Features
+
+- Create user bootstrap script if not existing
+  ([`4cce791`](https://github.com/cuinixam/pypeline/commit/4cce791f95d77fb1d44f7c5d6f8f8806bfcb1d36))
+
+
 ## v1.23.2 (2026-01-17)
 
 ### Bug Fixes
