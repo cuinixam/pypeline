@@ -287,11 +287,11 @@ class CreateVEnv(PipelineStep[ExecutionContext]):
             ).execute()
         else:
             # Use internal bootstrap script
-            skip_venv_creation = False
+            skip_venv_delete = False
             python_executable = Path(sys.executable).absolute()
             if python_executable.is_relative_to(self.project_root_dir):
-                self.logger.info(f"Detected that the python executable '{python_executable}' is from the virtual environment. Skip updating the virtual environment.")
-                skip_venv_creation = True
+                self.logger.info(f"Detected that the python executable '{python_executable}' is from the virtual environment. Will update dependencies but skip venv deletion.")
+                skip_venv_delete = True
 
             # Create bootstrap.json with all configuration
             bootstrap_config = {}
@@ -330,8 +330,8 @@ class CreateVEnv(PipelineStep[ExecutionContext]):
             if self.bootstrap_config_file.exists():
                 bootstrap_args.extend(["--config", self.bootstrap_config_file.as_posix()])
 
-            if skip_venv_creation:
-                bootstrap_args.append("--skip-venv-creation")
+            if skip_venv_delete:
+                bootstrap_args.append("--skip-venv-delete")
 
             # Copy the internal bootstrap script to the project root .bootstrap/bootstrap.py
             self.target_internal_bootstrap_script.parent.mkdir(exist_ok=True)

@@ -282,3 +282,37 @@ def test_ensure_correct_python_version_sets_env_vars(
         expected_call_objects = [call(key, value) for key, value in expected_calls]
         mock_set_env.assert_has_calls(expected_call_objects)
         assert mock_set_env.call_count == len(expected_calls)
+
+
+@pytest.mark.parametrize(
+    "skip_venv_delete, marker_exists, stored_version, expect_rmtree_called",
+    [
+        pytest.param(False, True, "3.10.0", True, id="delete_on_version_mismatch"),
+        pytest.param(True, True, "3.10.0", False, id="skip_delete_on_version_mismatch"),
+        pytest.param(False, False, None, True, id="delete_when_no_marker"),
+        pytest.param(True, False, None, False, id="skip_delete_when_no_marker"),
+        pytest.param(False, True, f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}", False, id="no_delete_when_version_matches"),
+    ],
+)
+def test_check_python_version_compatibility_respects_skip_venv_delete(
+    tmp_path: Path,
+    skip_venv_delete: bool,
+    marker_exists: bool,
+    stored_version: str | None,
+    expect_rmtree_called: bool,
+) -> None:
+    project_dir = tmp_path / "project"
+    project_dir.mkdir(parents=True)
+    venv_dir = project_dir / ".venv"
+    venv_dir.mkdir(parents=True)
+    marker_file = venv_dir / ".python_version"
+    if marker_exists and stored_version:
+        marker_file.write_text(stored_version)
+
+    config = BootstrapConfig(package_manager="uv>=0.6")
+    bootstrap_env = CreateBootstrapEnvironment(config, project_dir)
+    create_venv = CreateVirtualEnvironment(project_dir, bootstrap_env, skip_venv_delete=skip_venv_delete)
+
+    with patch("pypeline.bootstrap.run.shutil.rmtree") as mock_rmtree:
+        create_venv._check_python_version_compatibility()
+        assert mock_rmtree.called == expect_rmtree_called

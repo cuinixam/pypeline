@@ -583,6 +583,7 @@ class CreateVirtualEnvironment(Runnable):
         self,
         root_dir: Path,
         bootstrap_env: CreateBootstrapEnvironment,
+        skip_venv_delete: bool = False,
     ) -> None:
         self.root_dir = root_dir
         self.venv_dir = self.root_dir / ".venv"
@@ -591,6 +592,7 @@ class CreateVirtualEnvironment(Runnable):
         self.bootstrap_env = bootstrap_env
         self.config = bootstrap_env.config
         self.python_version_marker = self.venv_dir / VENV_PYTHON_VERSION_MARKER
+        self.skip_venv_delete = skip_venv_delete
 
     @property
     def package_manager_name(self) -> str:
@@ -602,6 +604,7 @@ class CreateVirtualEnvironment(Runnable):
 
         If the Python version has changed (e.g., switching branches), delete the
         existing venv so it can be recreated by the package manager.
+        If skip_venv_delete is True, log a warning instead of deleting.
         """
         if not self.venv_dir.exists():
             return
@@ -609,19 +612,27 @@ class CreateVirtualEnvironment(Runnable):
         current_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
 
         if not self.python_version_marker.exists():
-            logger.info(
-                f"No Python version marker found in {self.venv_dir}. "
-                f"This venv may have been created before version tracking was added. "
-                f"Deleting {self.venv_dir} to ensure clean state."
-            )
-            shutil.rmtree(self.venv_dir)
+            if self.skip_venv_delete:
+                logger.warning(f"No Python version marker found in {self.venv_dir}. Cannot verify venv compatibility, but skipping deletion as requested.")
+            else:
+                logger.info(
+                    f"No Python version marker found in {self.venv_dir}. "
+                    f"This venv may have been created before version tracking was added. "
+                    f"Deleting {self.venv_dir} to ensure clean state."
+                )
+                shutil.rmtree(self.venv_dir)
             return
 
         try:
             stored_version = self.python_version_marker.read_text().strip()
             if stored_version != current_version:
-                logger.info(f"Python version changed from {stored_version} to {current_version}. Deleting {self.venv_dir} for recreation.")
-                shutil.rmtree(self.venv_dir)
+                if self.skip_venv_delete:
+                    logger.warning(
+                        f"Python version changed from {stored_version} to {current_version}. Skipping venv deletion as requested - dependencies will be updated in place."
+                    )
+                else:
+                    logger.info(f"Python version changed from {stored_version} to {current_version}. Deleting {self.venv_dir} for recreation.")
+                    shutil.rmtree(self.venv_dir)
         except OSError as exc:
             logger.warning(f"Could not read Python version marker: {exc}")
 
@@ -772,11 +783,11 @@ def main() -> int:
             help="Specify the project directory (default: current working directory).",
         )
         parser.add_argument(
-            "--skip-venv-creation",
+            "--skip-venv-delete",
             action="store_true",
             required=False,
             default=False,
-            help="Skip the virtual environment creation process.",
+            help="Skip deleting the virtual environment (used when running from within the venv). Dependencies will still be updated.",
         )
         parser.add_argument(
             "--config",
@@ -804,13 +815,11 @@ def main() -> int:
         bootstrap_executor.execute(bootstrap_env)
 
         # Step 2: Create the project virtual environment using the bootstrap env
-        # Skip if requested (e.g., when running from within the venv)
-        if not args.skip_venv_creation:
-            project_venv = CreateVirtualEnvironment(project_dir, bootstrap_env)
-            project_executor = Executor(project_venv.venv_dir)
-            project_executor.execute(project_venv)
-        else:
-            logger.info("Skipping virtual environment creation as requested.")
+        # When skip_venv_delete is True (e.g., running from within the venv),
+        # we still update dependencies but skip deleting the venv to avoid write access exceptions
+        project_venv = CreateVirtualEnvironment(project_dir, bootstrap_env, skip_venv_delete=args.skip_venv_delete)
+        project_executor = Executor(project_venv.venv_dir)
+        project_executor.execute(project_venv)
 
     except UserNotificationException as exc:
         logger.error(exc)
