@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.24.1 (2026-01-18)
+
+### Bug Fixes
+
+- Bootstrap config merge type conflict
+  ([`0f2c963`](https://github.com/cuinixam/pypeline/commit/0f2c963e7f7727e320d86cf5f6f8e5e895ceb2a4))
+
+
 ## v1.24.0 (2026-01-17)
 
 ### Features
