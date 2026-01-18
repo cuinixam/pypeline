@@ -316,7 +316,7 @@ class CreateVEnv(PipelineStep[ExecutionContext]):
 
     def run(self) -> int:
         self.logger.debug(f"Run {self.get_name()} step. Output dir: {self.output_dir}")
-        bootstrap_config: Dict[str, Any] = {}
+        bootstrap_config = CreateVEnvConfig()
         is_managed = False
         # Determine target script and mode
         if self.user_config.bootstrap_script:
@@ -356,17 +356,17 @@ class CreateVEnv(PipelineStep[ExecutionContext]):
             for field_name in self.user_config.get_all_properties_names(["bootstrap_script", "python_executable"]):
                 val = getattr(self.user_config, field_name)
                 if val is not None:
-                    bootstrap_config[field_name] = val
+                    setattr(bootstrap_config, field_name, val)
 
             # Priority: input python_version takes precedence over config python_version
             input_python_version = self.execution_context.get_input("python_version")
             if input_python_version:
-                bootstrap_config["python_version"] = input_python_version
+                bootstrap_config.python_version = input_python_version
 
             # Write bootstrap.json if any configuration is provided
-            if bootstrap_config:
+            if bootstrap_config.is_any_property_set():
                 self.bootstrap_config_file.parent.mkdir(exist_ok=True)
-                CreateVEnvConfig.from_dict(bootstrap_config).to_json_file(self.bootstrap_config_file)
+                bootstrap_config.to_json_file(self.bootstrap_config_file)
                 self.logger.info(f"Created bootstrap configuration at {self.bootstrap_config_file}")
 
             # Build bootstrap script arguments

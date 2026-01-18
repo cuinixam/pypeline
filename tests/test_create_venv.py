@@ -508,3 +508,32 @@ def test_create_venv_config_from_json_file(tmp_path: Path) -> None:
     assert config.python_version == "3.10"
     assert config.python_package_manager == "uv>=0.6"
     assert config.bootstrap_script is None
+
+
+def test_missing_custom_script_merges_bootstrap_json_with_user_config(execution_context: Mock) -> None:
+    bootstrap_script = "custom_bootstrap.py"
+
+    # Create the project-root bootstrap.json config file that will be loaded at line 334
+    default_bootstrap_config = execution_context.project_root_dir / "bootstrap.json"
+    default_bootstrap_config.write_text('{"python_version": "3.10", "python_package_manager": "poetry>=1.0"}')
+
+    # Create config with user settings that will be added to bootstrap_config
+    # python_package_manager should override the value from bootstrap.json
+    config = {
+        "bootstrap_script": bootstrap_script,
+        "python_package_manager": "uv>=0.6",
+    }
+
+    create_venv = CreateVEnv(execution_context, "group_name", config)
+
+    # Should execute successfully without TypeError
+    create_venv.run()
+
+    # Verify the bootstrap config file was created with merged settings
+    bootstrap_config_file = execution_context.project_root_dir / ".bootstrap" / "bootstrap.json"
+    assert bootstrap_config_file.exists()
+
+    # Verify the merged configuration
+    saved_config = CreateVEnvConfig.from_json_file(bootstrap_config_file)
+    assert saved_config.python_version == "3.10"  # From bootstrap.json
+    assert saved_config.python_package_manager == "uv>=0.6"  # From user config (overridden)
