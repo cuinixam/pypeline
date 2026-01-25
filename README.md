@@ -64,6 +64,15 @@ This will install the `pypeline` command globally, which you can use to run your
 
 Documentation: [pypeline-runner.readthedocs.io](https://pypeline-runner.readthedocs.io)
 
+## Quick Start
+
+```shell
+pipx install pypeline-runner
+pypeline init --project-dir my-pipeline
+cd my-pipeline
+pypeline run
+```
+
 ## Walkthrough: Getting Started with Pypeline
 
 To get started run the `init` command to create a sample project:
@@ -103,10 +112,19 @@ pypeline run --project-dir my-pipeline
 ## Contributing
 
 The project uses Poetry for dependencies management and packaging.
-Run the `bootstrap.ps1` script to install Python and create the virtual environment.
+You can set up the development environment using one of the following methods:
 
-```powershell
-.\bootstrap.ps1
+**Option 1: Using Poetry directly** (minimal setup)
+
+```shell
+poetry install
+```
+
+**Option 2: Using pypeline-runner** (runs the full pipeline including tests and checks)
+
+```shell
+pipx install pypeline-runner
+pypeline run
 ```
 
 To execute the test suite, call pytest inside Poetry's virtual environment via `poetry run`:
@@ -127,4 +145,4 @@ This repository uses [commitlint](https://github.com/conventional-changelog/comm
 
 ## Credits
 
-This package was created with [Copier](https://copier.readthedocs.io/) and the [cuinixam/pypackage-template](https://github.com/cuinixam/pypackage-template) project template.
+This package was created with [Copier](https://copier.readthedocs.io/) and the [browniebroke/pypackage-template](https://github.com/browniebroke/pypackage-template) project template.

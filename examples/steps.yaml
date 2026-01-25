@@ -1,0 +1,9 @@
+my_steps:
+  - step: AddStep
+    file: custom_pipeline.py
+    config:
+      param: 5
+  - step: MultiplyStep
+    file: custom_pipeline.py
+    config:
+      param: 2

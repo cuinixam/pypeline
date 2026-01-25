@@ -125,7 +125,8 @@ Tests use `conftest.py` fixtures for consistent setup:
 ### Environment Setup
 
 ```bash
-./bootstrap.ps1  # Creates .venv and installs dependencies
+pipx install pypeline-runner  # Install pypeline globally
+pypeline run                   # Creates .venv and installs dependencies
 ```
 
 ### Running Tasks
