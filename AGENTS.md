@@ -34,7 +34,7 @@ The architecture follows a clean separation of concerns with three main layers:
 - `update_execution_context()`: Share state with subsequent steps (called **every time**, even if step skipped)
 - `get_needs_dependency_management()`: Return `False` to force step execution regardless of dependencies
 
-**ExecutionContext** is the shared state container passed to all steps:
+**ExecutionContext** is the shared state container passed to all steps (see [pypeline-steps skill](.agent/skills/pypeline-steps/SKILL.md) for usage examples):
 
 - `install_dirs: List[Path]`: Binary directories automatically added to subprocess PATH
 - `data_registry: DataRegistry`: Type-safe key-value store for arbitrary data exchange
@@ -78,6 +78,8 @@ Pypeline solves the software product line problem where pipelines become tightly
 
 ### Creating Pipeline Steps
 
+> **📖 Reference**: For detailed examples of creating custom steps, using ExecutionContext, DataRegistry patterns, and step configuration, see [pypeline-steps skill](.agent/skills/pypeline-steps/SKILL.md).
+
 Follow the template in `src/pypeline/kickstart/templates/project/steps/my_step.py`:
 
 ```python
@@ -93,6 +95,8 @@ class MyStep(PipelineStep[ExecutionContext]):
 ```
 
 ### Configuration Structure
+
+> **📖 Reference**: For complete YAML configuration examples including inputs, step loading patterns, and running pipelines, see [pypeline-steps skill](.agent/skills/pypeline-steps/SKILL.md).
 
 Pipeline configs in `pypeline.yaml` support both flat lists and grouped steps:
 
@@ -221,23 +225,25 @@ pypeline run -i param=value             # Pass input parameters
 
 ### Validation Requirements
 
-4. **Run Full Pipeline**: After making changes, **ALWAYS** run:
+1. **Run Full Pipeline**: After making changes, **ALWAYS** run:
+
    ```bash
    pypeline run
    ```
+
    This executes:
    - Virtual environment setup
    - Pre-commit hooks (linting, type checking)
    - All tests
    - Code quality checks
 
-5. **Pre-Commit Compliance**: Code MUST pass all pre-commit checks:
+2. **Pre-Commit Compliance**: Code MUST pass all pre-commit checks:
    - `ruff` (linting)
    - `mypy` (type checking)
    - `codespell` (spelling)
    - All other configured hooks
 
-6. **No Shortcuts**: Do not commit code that:
+3. **No Shortcuts**: Do not commit code that:
    - Bypasses tests
    - Fails linting or type checking
    - Breaks existing functionality
