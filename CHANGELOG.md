@@ -1,6 +1,17 @@
 # CHANGELOG
 
 
+## v1.25.0 (2026-01-31)
+
+### Features
+
+- Make west install step workspace configurable
+  ([`9c1662e`](https://github.com/cuinixam/pypeline/commit/9c1662e04b182f48800ddab1d2f2adc9f2b665f3))
+
+- Support multiple west manifests and track installed modules
+  ([`493bfa8`](https://github.com/cuinixam/pypeline/commit/493bfa81db93d1d211560d8a1c0032605287ab6b))
+
+
 ## v1.24.1 (2026-01-18)
 
 ### Bug Fixes
