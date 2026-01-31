@@ -115,16 +115,44 @@ class WestInstallResult(DataClassJSONMixin):
         file_path.write_text(self.to_json_string())
 
 
+@dataclass
+class WestWorkspaceDir:
+    """West workspace directory path for data registry sharing."""
+
+    path: Path
+
+
+@dataclass
+class WestInstallConfig(DataClassJSONMixin):
+    """Configuration for WestInstall step."""
+
+    #: Relative path from project root for west workspace directory
+    workspace_dir: Optional[str] = None
+
+
 class WestInstall(PipelineStep[ExecutionContext]):
     def __init__(self, execution_context: ExecutionContext, group_name: str, config: Optional[dict[str, Any]] = None) -> None:
         super().__init__(execution_context, group_name, config)
         self.logger = logger.bind()
         self.install_result = WestInstallResult()
+        self.user_config = WestInstallConfig.from_dict(config) if config else WestInstallConfig()
 
-        # Yanga-specific: external_dir and manifests require variant/platform artifacts locator
-        artifacts_locator = execution_context.create_artifacts_locator()
-        self._west_workspace_dir = artifacts_locator.build_dir
+        self._west_workspace_dir = self._resolve_workspace_dir()
         self._manifests = self._collect_manifests()
+
+    def _resolve_workspace_dir(self) -> Path:
+        """Resolve workspace directory from data registry (priority) or config."""
+        # Check data registry first (highest priority)
+        registry_entries = self.execution_context.data_registry.find_data(WestWorkspaceDir)
+        if registry_entries:
+            return registry_entries[0].path
+
+        # Check config
+        if self.user_config.workspace_dir:
+            return self.project_root_dir / self.user_config.workspace_dir
+
+        # Fallback to build dir
+        return self.execution_context.create_artifacts_locator().build_dir
 
     def _collect_manifests(self) -> list[WestManifestFile]:
         manifests: list[WestManifestFile] = []
@@ -160,6 +188,11 @@ class WestInstall(PipelineStep[ExecutionContext]):
 
     def get_name(self) -> str:
         return self.__class__.__name__
+
+    def get_config(self) -> dict[str, str] | None:
+        if self.user_config.workspace_dir:
+            return {"workspace_dir": self.user_config.workspace_dir}
+        return None
 
     def _merge_manifests(self, manifests: list[WestManifest]) -> WestManifest:
         """Merge multiple manifests, preserving order. First occurrence wins."""

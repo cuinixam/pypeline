@@ -11,10 +11,12 @@ from pypeline.domain.execution_context import ExecutionContext
 from pypeline.steps.west_install import (
     WestDependency,
     WestInstall,
+    WestInstallConfig,
     WestInstallResult,
     WestManifest,
     WestManifestFile,
     WestRemote,
+    WestWorkspaceDir,
 )
 
 # ============================================================================
@@ -324,7 +326,6 @@ def test_west_install_merge_manifests(west_execution_context: Mock) -> None:
 
 
 def test_west_install_write_manifest_generates_yaml(west_execution_context: Mock) -> None:
-    """Test that _write_west_manifest_file generates a valid west.yaml."""
     step = WestInstall(west_execution_context, "group_name")
 
     remote = WestRemote(name="origin", url_base="https://github.com/org")
@@ -347,7 +348,6 @@ def test_west_install_write_manifest_generates_yaml(west_execution_context: Mock
 
 
 def test_west_install_write_manifest_skips_empty(west_execution_context: Mock) -> None:
-    """Test that empty manifest does not generate a file."""
     step = WestInstall(west_execution_context, "group_name")
     manifest = WestManifest()
 
@@ -358,7 +358,6 @@ def test_west_install_write_manifest_skips_empty(west_execution_context: Mock) -
 
 
 def test_west_install_run_with_manifest(west_execution_context: Mock) -> None:
-    """Test full run with a manifest - verifies west init and update are called."""
     manifest_content = """
 manifest:
   remotes:
@@ -386,7 +385,6 @@ manifest:
 
 
 def test_west_install_run_records_installed_directories(west_execution_context: Mock) -> None:
-    """Test that installed directories are recorded after west update."""
     manifest_content = """
 manifest:
   remotes:
@@ -401,10 +399,10 @@ manifest:
     manifest_file = west_execution_context.project_root_dir / "west.yaml"
     manifest_file.write_text(manifest_content)
 
-    # Create the external directory and dependency directory
+    # Create the workspace directory and dependency directory (default is build_dir)
     artifacts_locator = ProjectArtifactsLocator(west_execution_context.project_root_dir)
-    external_dir = artifacts_locator.external_dependencies_dir
-    dep_dir = external_dir / "dep1"
+    workspace_dir = artifacts_locator.build_dir
+    dep_dir = workspace_dir / "dep1"
     dep_dir.mkdir(parents=True)
 
     mock_executor = Mock()
@@ -413,12 +411,11 @@ manifest:
     step = WestInstall(west_execution_context, "group_name")
     step.run()
 
-    assert external_dir in step.installed_dirs
+    assert workspace_dir in step.installed_dirs
     assert dep_dir in step.installed_dirs
 
 
 def test_west_install_get_inputs_includes_source_manifest(west_execution_context: Mock) -> None:
-    """Test that get_inputs includes the source manifest file."""
     manifest_file = west_execution_context.project_root_dir / "west.yaml"
     manifest_file.write_text("manifest: {remotes: [], projects: []}")
 
@@ -429,7 +426,6 @@ def test_west_install_get_inputs_includes_source_manifest(west_execution_context
 
 
 def test_west_install_get_outputs(west_execution_context: Mock) -> None:
-    """Test that get_outputs includes output manifest and result file."""
     step = WestInstall(west_execution_context, "group_name")
     outputs = step.get_outputs()
 
@@ -438,7 +434,6 @@ def test_west_install_get_outputs(west_execution_context: Mock) -> None:
 
 
 def test_west_install_update_execution_context(west_execution_context: Mock) -> None:
-    """Test that update_execution_context adds install dirs to context."""
     # Create result file with installed dirs
     step = WestInstall(west_execution_context, "group_name")
     step._install_result_file.parent.mkdir(parents=True, exist_ok=True)
@@ -456,7 +451,6 @@ def test_west_install_update_execution_context(west_execution_context: Mock) -> 
 
 
 def test_west_install_update_execution_context_no_file(west_execution_context: Mock) -> None:
-    """Test that update_execution_context does nothing if result file doesn't exist."""
     step = WestInstall(west_execution_context, "group_name")
     step.update_execution_context()
 
@@ -464,7 +458,6 @@ def test_west_install_update_execution_context_no_file(west_execution_context: M
 
 
 def test_west_install_with_data_registry_manifest(west_execution_context: Mock) -> None:
-    """Test that manifests from data_registry are collected."""
     # Register a WestManifestFile in the data registry
     registered_manifest = WestManifestFile(
         manifest=WestManifest(
@@ -481,7 +474,6 @@ def test_west_install_with_data_registry_manifest(west_execution_context: Mock) 
 
 
 def test_west_install_merges_source_and_registry_manifests(west_execution_context: Mock) -> None:
-    """Test that source and registry manifests are both collected."""
     # Create source manifest
     manifest_content = """
 manifest:
@@ -512,7 +504,6 @@ manifest:
 
 
 def test_west_install_run_failure_raises_exception(west_execution_context: Mock) -> None:
-    """Test that west command failure raises UserNotificationException."""
     manifest_content = """
 manifest:
   remotes:
@@ -539,7 +530,6 @@ manifest:
 
 
 def test_west_install_west_init_command(west_execution_context: Mock) -> None:
-    """Test the exact command used for west init."""
     manifest_content = """
 manifest:
   remotes:
@@ -571,7 +561,6 @@ manifest:
 
 
 def test_west_install_west_update_command(west_execution_context: Mock) -> None:
-    """Test the exact command used for west update."""
     manifest_content = """
 manifest:
   remotes:
@@ -600,7 +589,6 @@ manifest:
 
 
 def test_west_install_result_file_created_after_run(west_execution_context: Mock) -> None:
-    """Test that result file is created after successful run."""
     manifest_content = """
 manifest:
   remotes:
@@ -625,7 +613,6 @@ manifest:
 
 
 def test_west_install_duplicate_installed_dirs_removed(west_execution_context: Mock) -> None:
-    """Test that duplicate directories are removed from installed_dirs."""
     manifest_content = """
 manifest:
   remotes:
@@ -644,10 +631,10 @@ manifest:
     manifest_file = west_execution_context.project_root_dir / "west.yaml"
     manifest_file.write_text(manifest_content)
 
-    # Create the external directory and dependency directory
+    # Create the workspace directory and dependency directory (default is build_dir)
     artifacts_locator = ProjectArtifactsLocator(west_execution_context.project_root_dir)
-    external_dir = artifacts_locator.external_dependencies_dir
-    dep_dir = external_dir / "dep1"
+    workspace_dir = artifacts_locator.build_dir
+    dep_dir = workspace_dir / "dep1"
     dep_dir.mkdir(parents=True)
 
     mock_executor = Mock()
@@ -662,10 +649,72 @@ manifest:
 
 
 def test_west_manifest_file_handles_malformed_yaml(tmp_path: Path) -> None:
-    """Test handling of YAML with syntax errors."""
     manifest_file = tmp_path / "west.yaml"
     # This has a colon inside an unquoted string which causes a parser error
     manifest_file.write_text("manifest:\n  key: value: error")
 
     with pytest.raises(UserNotificationException, match=r"Failed (scanning|parsing) west manifest file"):
         WestManifestFile.from_file(manifest_file)
+
+
+# ============================================================================
+# WestInstallConfig and WestWorkspaceDir Tests
+# ============================================================================
+
+
+def test_west_install_config_defaults() -> None:
+    config = WestInstallConfig()
+    assert config.workspace_dir is None
+
+
+def test_west_install_config_from_dict() -> None:
+    config = WestInstallConfig.from_dict({"workspace_dir": "external/deps"})
+    assert config.workspace_dir == "external/deps"
+
+
+def test_west_workspace_dir_creation() -> None:
+    workspace = WestWorkspaceDir(path=Path("/custom/path"))
+    assert workspace.path == Path("/custom/path")
+
+
+def test_west_install_workspace_dir_from_config(west_execution_context: Mock) -> None:
+    config = {"workspace_dir": "custom/workspace"}
+    step = WestInstall(west_execution_context, "group_name", config)
+
+    expected_path = west_execution_context.project_root_dir / "custom/workspace"
+    assert step._west_workspace_dir == expected_path
+
+
+def test_west_install_workspace_dir_from_data_registry(west_execution_context: Mock) -> None:
+    custom_path = west_execution_context.project_root_dir / "registry/workspace"
+
+    # Register workspace dir in data registry
+    west_execution_context.data_registry.insert(WestWorkspaceDir(path=custom_path), provider="TestProvider")
+
+    # Config also provides a workspace_dir, but registry should win
+    config = {"workspace_dir": "config/workspace"}
+    step = WestInstall(west_execution_context, "group_name", config)
+
+    assert step._west_workspace_dir == custom_path
+
+
+def test_west_install_workspace_dir_fallback_to_build_dir(west_execution_context: Mock) -> None:
+    step = WestInstall(west_execution_context, "group_name")
+
+    artifacts_locator = ProjectArtifactsLocator(west_execution_context.project_root_dir)
+    assert step._west_workspace_dir == artifacts_locator.build_dir
+
+
+def test_west_install_workspace_dir_registry_priority_over_config(west_execution_context: Mock) -> None:
+    registry_path = west_execution_context.project_root_dir / "from_registry"
+    config_path = "from_config"
+
+    # Register in data registry
+    west_execution_context.data_registry.insert(WestWorkspaceDir(path=registry_path), provider="TestProvider")
+
+    config = {"workspace_dir": config_path}
+    step = WestInstall(west_execution_context, "group_name", config)
+
+    # Registry should win
+    assert step._west_workspace_dir == registry_path
+    assert step._west_workspace_dir != west_execution_context.project_root_dir / config_path
