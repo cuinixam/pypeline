@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.26.0 (2026-02-01)
+
+### Features
+
+- Make WestInstall step generic for custom execution contexts
+  ([`dfa5ffe`](https://github.com/cuinixam/pypeline/commit/dfa5ffea89bd40b6e6ffa08462ccc0be4f539c83))
+
+
 ## v1.25.0 (2026-01-31)
 
 ### Features
