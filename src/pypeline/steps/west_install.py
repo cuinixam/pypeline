@@ -3,7 +3,7 @@ import json
 import traceback
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Generic, Optional, TypeVar
 
 import yaml
 from mashumaro.config import BaseConfig
@@ -130,15 +130,22 @@ class WestInstallConfig(DataClassJSONMixin):
     workspace_dir: Optional[str] = None
 
 
-class WestInstall(PipelineStep[ExecutionContext]):
-    def __init__(self, execution_context: ExecutionContext, group_name: str, config: Optional[dict[str, Any]] = None) -> None:
+TContext = TypeVar("TContext", bound=ExecutionContext)
+
+
+class WestInstall(PipelineStep[TContext], Generic[TContext]):
+    def __init__(self, execution_context: TContext, group_name: str, config: Optional[dict[str, Any]] = None) -> None:
         super().__init__(execution_context, group_name, config)
         self.logger = logger.bind()
         self.install_result = WestInstallResult()
         self.user_config = WestInstallConfig.from_dict(config) if config else WestInstallConfig()
 
         self._west_workspace_dir = self._resolve_workspace_dir()
-        self._manifests = self._collect_manifests()
+        self._manifest_files = self._collect_manifests()
+
+    @property
+    def _manifests(self) -> list[WestManifest]:
+        return [mf.manifest for mf in self._manifest_files]
 
     def _resolve_workspace_dir(self) -> Path:
         """Resolve workspace directory from data registry (priority) or config."""
@@ -194,7 +201,10 @@ class WestInstall(PipelineStep[ExecutionContext]):
             return {"workspace_dir": self.user_config.workspace_dir}
         return None
 
-    def _merge_manifests(self, manifests: list[WestManifest]) -> WestManifest:
+    def _merge_manifests(self) -> WestManifest:
+        return self._do_merge_manifests(self._manifests)
+
+    def _do_merge_manifests(self, manifests: list[WestManifest]) -> WestManifest:
         """Merge multiple manifests, preserving order. First occurrence wins."""
         merged = WestManifest()
         for manifest in manifests:
@@ -255,7 +265,7 @@ class WestInstall(PipelineStep[ExecutionContext]):
         self.logger.debug(f"Run {self.get_name()} step. Output dir: {self.output_dir}")
 
         try:
-            merged_manifest = self._merge_manifests([mf.manifest for mf in self._manifests])
+            merged_manifest = self._merge_manifests()
             self._write_west_manifest_file(merged_manifest)
 
             if not merged_manifest.projects:
@@ -289,7 +299,7 @@ class WestInstall(PipelineStep[ExecutionContext]):
 
     def get_inputs(self) -> list[Path]:
         inputs: list[Path] = []
-        for manifest_file in self._manifests:
+        for manifest_file in self._manifest_files:
             if manifest_file.file and manifest_file.file.exists():
                 inputs.append(manifest_file.file)
         return inputs
@@ -298,7 +308,7 @@ class WestInstall(PipelineStep[ExecutionContext]):
         outputs: list[Path] = [self._output_manifest_file, self._install_result_file]
         if self.install_result.installed_dirs:
             outputs.extend(self.install_result.installed_dirs)
-        elif self._manifests:
+        elif self._manifest_files:
             outputs.append(self._west_workspace_dir)
         return outputs
 

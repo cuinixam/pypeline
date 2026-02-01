@@ -248,3 +248,10 @@ pypeline run -i param=value             # Pass input parameters
    - Fails linting or type checking
    - Breaks existing functionality
    - Lacks test coverage for critical functionality
+
+### Definition of Done
+
+1. **Acceptance Criteria**: Changes are NOT complete until:
+   - `pypeline run` executes with **zero failures**
+   - All pre-commit checks pass
+   - New functionality has appropriate test coverage

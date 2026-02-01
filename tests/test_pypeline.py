@@ -11,8 +11,7 @@ from pypeline.domain.config import ProjectConfig
 from pypeline.domain.execution_context import ExecutionContext
 from pypeline.domain.pipeline import PipelineConfig, PipelineStep, PipelineStepConfig, PipelineStepReference
 from pypeline.pypeline import PipelineScheduler, PipelineStepsExecutor, RunCommandClassFactory
-
-from .utils import assert_element_of_type
+from tests.conftest import assert_element_of_type
 
 
 @pytest.fixture

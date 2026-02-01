@@ -18,6 +18,7 @@ from pypeline.steps.west_install import (
     WestRemote,
     WestWorkspaceDir,
 )
+from tests.conftest import assert_element_of_type
 
 # ============================================================================
 # WestRemote Tests
@@ -119,11 +120,14 @@ manifest:
     west_manifest = WestManifestFile.from_file(manifest_file)
 
     assert west_manifest.file == manifest_file
-    assert len(west_manifest.manifest.remotes) == 1
-    assert len(west_manifest.manifest.projects) == 1
-    assert west_manifest.manifest.remotes[0].name == "origin"
-    assert west_manifest.manifest.remotes[0].url_base == "https://github.com/org"
-    assert west_manifest.manifest.projects[0].name == "zephyr"
+    remote = assert_element_of_type(west_manifest.manifest.remotes, WestRemote)
+    assert remote.name == "origin"
+    assert remote.url_base == "https://github.com/org"
+    dep = assert_element_of_type(west_manifest.manifest.projects, WestDependency)
+    assert dep.name == "zephyr"
+    assert dep.remote == "origin"
+    assert dep.revision == "v3.2.0"
+    assert dep.path == "modules/zephyr"
 
 
 def test_west_manifest_file_parse_error(tmp_path: Path) -> None:
@@ -267,8 +271,8 @@ manifest:
     step = WestInstall(west_execution_context, "group_name")
 
     assert len(step._manifests) == 1
-    assert len(step._manifests[0].manifest.projects) == 1
-    assert step._manifests[0].manifest.projects[0].name == "dep1"
+    assert len(step._manifests[0].projects) == 1
+    assert step._manifests[0].projects[0].name == "dep1"
 
 
 def test_west_install_output_manifest_file_path(west_execution_context: Mock) -> None:
@@ -310,7 +314,7 @@ def test_west_install_merge_manifests(west_execution_context: Mock) -> None:
     manifest1 = WestManifest(remotes=[remote1], projects=[dep1])
     manifest2 = WestManifest(remotes=[remote2, remote3], projects=[dep2, dep3])
 
-    merged = step._merge_manifests([manifest1, manifest2])
+    merged = step._do_merge_manifests([manifest1, manifest2])
 
     # True duplicates (identical objects) are removed
     assert len(merged.remotes) == 2
@@ -469,8 +473,8 @@ def test_west_install_with_data_registry_manifest(west_execution_context: Mock) 
 
     step = WestInstall(west_execution_context, "group_name")
 
-    assert len(step._manifests) == 1
-    assert step._manifests[0].manifest.projects[0].name == "reg-dep"
+    manifest = assert_element_of_type(step._manifests, WestManifest)
+    assert manifest.projects[0].name == "reg-dep"
 
 
 def test_west_install_merges_source_and_registry_manifests(west_execution_context: Mock) -> None:
@@ -718,3 +722,65 @@ def test_west_install_workspace_dir_registry_priority_over_config(west_execution
     # Registry should win
     assert step._west_workspace_dir == registry_path
     assert step._west_workspace_dir != west_execution_context.project_root_dir / config_path
+
+
+# ============================================================================
+# Generic Execution Context Inheritance Tests
+# ============================================================================
+
+
+class CustomExecutionContext(ExecutionContext):
+    """Custom execution context with additional attributes for testing generic inheritance."""
+
+    def __init__(self, project_root_dir: Path, custom_attribute: str) -> None:
+        super().__init__(project_root_dir)
+        self.custom_attribute = custom_attribute
+
+
+class CustomWestInstall(WestInstall[CustomExecutionContext]):
+    """Subclass that uses a custom execution context type."""
+
+    def _collect_manifests(self) -> list[WestManifestFile]:
+        # Access the custom attribute - this verifies type safety
+        _ = self.execution_context.custom_attribute
+        return super()._collect_manifests()
+
+    def get_custom_attribute(self) -> str:
+        """Method that accesses the custom execution context attribute."""
+        return self.execution_context.custom_attribute
+
+
+def test_west_install_generic_inheritance_with_custom_context(tmp_path: Path) -> None:
+    """Test that WestInstall can be subclassed with a custom ExecutionContext type."""
+    custom_context = CustomExecutionContext(tmp_path, custom_attribute="test_value")
+
+    step = CustomWestInstall(custom_context, "group_name")
+
+    # Verify the custom attribute is accessible via the typed getter
+    assert step.get_custom_attribute() == "test_value"
+    # Verify the execution context is the same instance we passed in
+    assert step.execution_context is custom_context
+
+
+def test_west_install_generic_subclass_collect_manifests(tmp_path: Path) -> None:
+    """Test that overridden _collect_manifests can access custom context attributes."""
+    custom_context = CustomExecutionContext(tmp_path, custom_attribute="manifest_test")
+
+    # Create a manifest file to be collected
+    manifest_content = """
+manifest:
+  remotes:
+    - name: origin
+      url-base: https://github.com/org
+  projects:
+    - name: dep1
+      remote: origin
+      revision: v1.0.0
+      path: deps/dep1
+"""
+    manifest_file = tmp_path / "west.yaml"
+    manifest_file.write_text(manifest_content)
+
+    step = CustomWestInstall(custom_context, "group_name")
+
+    assert assert_element_of_type(step._manifests, WestManifest).projects[0].name == "dep1"
