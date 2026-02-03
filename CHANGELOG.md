@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.26.1 (2026-02-03)
+
+### Bug Fixes
+
+- Wrongly handles backslashes in custom boostrap path
+  ([`a580bfd`](https://github.com/cuinixam/pypeline/commit/a580bfd7f67e162e34824f174a56a4cadc51d033))
+
+
 ## v1.26.0 (2026-02-01)
 
 ### Features
