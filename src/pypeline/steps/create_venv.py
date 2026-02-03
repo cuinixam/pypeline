@@ -116,6 +116,8 @@ class CreateVEnv(PipelineStep[ExecutionContext]):
 
     def __init__(self, execution_context: ExecutionContext, group_name: str, config: Optional[Dict[str, Any]] = None) -> None:
         self.user_config = CreateVEnvConfig.from_dict(config) if config else CreateVEnvConfig()
+        if self.user_config.bootstrap_script:
+            self.user_config.bootstrap_script = self.user_config.bootstrap_script.replace("\\", "/")
         self.bootstrap_script_type = BootstrapScriptType.CUSTOM if self.user_config.bootstrap_script else BootstrapScriptType.INTERNAL
         super().__init__(execution_context, group_name, config)
         self.logger = logger.bind()
