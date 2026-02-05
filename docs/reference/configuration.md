@@ -97,9 +97,17 @@ Creates a Python virtual environment.
 
 Downloads multi-repo dependencies using [west](https://docs.zephyrproject.org/latest/develop/west/).
 
+| Config | Type | Default | Description |
+|--------|------|---------|-------------|
+| `manifest_file` | string | `west.yaml` | Relative path to west manifest file |
+| `workspace_dir` | string | `build/` | Relative path for west workspace directory |
+
 ```yaml
 - step: WestInstall
   module: pypeline.steps.west_install
+  config:
+    manifest_file: deps/west.yaml  # custom manifest location
+    workspace_dir: external/deps   # custom workspace directory
 ```
 
 ### ScoopInstall

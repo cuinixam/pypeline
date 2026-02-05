@@ -128,6 +128,8 @@ class WestInstallConfig(DataClassJSONMixin):
 
     #: Relative path from project root for west workspace directory
     workspace_dir: Optional[str] = None
+    #: Relative path from project root to west manifest file (defaults to west.yaml)
+    manifest_file: Optional[str] = None
 
 
 TContext = TypeVar("TContext", bound=ExecutionContext)
@@ -176,7 +178,9 @@ class WestInstall(PipelineStep[TContext], Generic[TContext]):
 
     @property
     def _source_manifest_file(self) -> Path:
-        """Optional west.yaml in project root (input)."""
+        """Source manifest file path. Uses configured path or defaults to west.yaml in project root."""
+        if self.user_config.manifest_file:
+            return self.project_root_dir / self.user_config.manifest_file
         return self.project_root_dir / "west.yaml"
 
     @property
@@ -197,9 +201,12 @@ class WestInstall(PipelineStep[TContext], Generic[TContext]):
         return self.__class__.__name__
 
     def get_config(self) -> dict[str, str] | None:
+        config: dict[str, str] = {}
         if self.user_config.workspace_dir:
-            return {"workspace_dir": self.user_config.workspace_dir}
-        return None
+            config["workspace_dir"] = self.user_config.workspace_dir
+        if self.user_config.manifest_file:
+            config["manifest_file"] = self.user_config.manifest_file
+        return config if config else None
 
     def _merge_manifests(self) -> WestManifest:
         return self._do_merge_manifests(self._manifests)

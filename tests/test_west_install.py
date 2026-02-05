@@ -676,6 +676,17 @@ def test_west_install_config_from_dict() -> None:
     assert config.workspace_dir == "external/deps"
 
 
+def test_west_install_config_manifest_file_from_dict() -> None:
+    config = WestInstallConfig.from_dict({"manifest_file": "deps/west.yaml"})
+    assert config.manifest_file == "deps/west.yaml"
+
+
+def test_west_install_config_both_options() -> None:
+    config = WestInstallConfig.from_dict({"workspace_dir": "external/deps", "manifest_file": "deps/west.yaml"})
+    assert config.workspace_dir == "external/deps"
+    assert config.manifest_file == "deps/west.yaml"
+
+
 def test_west_workspace_dir_creation() -> None:
     workspace = WestWorkspaceDir(path=Path("/custom/path"))
     assert workspace.path == Path("/custom/path")
@@ -722,6 +733,61 @@ def test_west_install_workspace_dir_registry_priority_over_config(west_execution
     # Registry should win
     assert step._west_workspace_dir == registry_path
     assert step._west_workspace_dir != west_execution_context.project_root_dir / config_path
+
+
+def test_west_install_manifest_file_from_config(west_execution_context: Mock) -> None:
+    """Test that custom manifest file path from config is used."""
+    manifest_content = """
+manifest:
+  remotes:
+    - name: origin
+      url-base: https://github.com/org
+  projects:
+    - name: custom-dep
+      remote: origin
+      revision: v1.0.0
+      path: deps/custom-dep
+"""
+    custom_manifest = west_execution_context.project_root_dir / "custom" / "west.yaml"
+    custom_manifest.parent.mkdir(parents=True)
+    custom_manifest.write_text(manifest_content)
+
+    config = {"manifest_file": "custom/west.yaml"}
+    step = WestInstall(west_execution_context, "group_name", config)
+
+    assert step._source_manifest_file == custom_manifest
+    assert len(step._manifests) == 1
+    assert step._manifests[0].projects[0].name == "custom-dep"
+
+
+def test_west_install_manifest_file_fallback_to_default(west_execution_context: Mock) -> None:
+    """Test that default west.yaml in project root is used when no config."""
+    step = WestInstall(west_execution_context, "group_name")
+
+    expected_path = west_execution_context.project_root_dir / "west.yaml"
+    assert step._source_manifest_file == expected_path
+
+
+def test_west_install_get_config_includes_manifest_file(west_execution_context: Mock) -> None:
+    """Test that get_config includes manifest_file when configured."""
+    config = {"manifest_file": "deps/west.yaml", "workspace_dir": "external"}
+    step = WestInstall(west_execution_context, "group_name", config)
+
+    result = step.get_config()
+    assert result is not None
+    assert result["manifest_file"] == "deps/west.yaml"
+    assert result["workspace_dir"] == "external"
+
+
+def test_west_install_get_config_only_manifest_file(west_execution_context: Mock) -> None:
+    """Test that get_config returns manifest_file when only it is configured."""
+    config = {"manifest_file": "deps/west.yaml"}
+    step = WestInstall(west_execution_context, "group_name", config)
+
+    result = step.get_config()
+    assert result is not None
+    assert result["manifest_file"] == "deps/west.yaml"
+    assert "workspace_dir" not in result
 
 
 # ============================================================================
