@@ -141,6 +141,16 @@ Use VS Code tasks or Python commands:
 - **Pre-commit**: `.venv/bin/python -m pre-commit run --all-files` (Task: "run pre-commit checks")
 - **Docs**: `.venv/bin/python -m sphinx-build -E -a docs docs/_build` (Task: "generate docs")
 
+### Package Management
+
+> [!CAUTION]
+> **This project uses Poetry.** Check for `poetry.lock` before managing dependencies.
+
+```bash
+source build/env_setup.sh              # Get access to Poetry first
+poetry add package_name@latest --no-cache  # Add/update packages
+```
+
 ### CLI Usage Patterns
 
 ```bash

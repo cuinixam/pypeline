@@ -1,3 +1,4 @@
+import hashlib
 import io
 import json
 import traceback
@@ -211,6 +212,13 @@ class WestInstall(PipelineStep[TContext], Generic[TContext]):
 
     def get_name(self) -> str:
         return self.__class__.__name__
+
+    def get_id(self) -> str:
+        """Return unique identifier for dependency tracking (.deps.json filename)."""
+        if self.user_config.manifest_file:
+            manifest_hash = hashlib.md5(self.user_config.manifest_file.encode(), usedforsecurity=False).hexdigest()[:8]
+            return f"{self.get_name()}_{manifest_hash}"
+        return self.get_name()
 
     def get_config(self) -> dict[str, str] | None:
         config: dict[str, str] = {}

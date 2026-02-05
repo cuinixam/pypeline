@@ -283,6 +283,18 @@ def test_west_install_get_name(west_execution_context: Mock) -> None:
     assert step.get_name() == "WestInstall"
 
 
+def test_west_install_get_id_default(west_execution_context: Mock) -> None:
+    step = WestInstall(west_execution_context, "group_name")
+    assert step.get_id() == "WestInstall"
+
+
+def test_west_install_get_id_with_config(west_execution_context: Mock) -> None:
+    config = {"manifest_file": "deps/west.yaml"}
+    step = WestInstall(west_execution_context, "group_name", config)
+    assert step.get_id().startswith("WestInstall_")
+    assert step.get_id() != "WestInstall"
+
+
 def test_west_install_no_manifests_skips(west_execution_context: Mock) -> None:
     """When no west.yaml exists and no manifests registered, step returns early."""
     step = WestInstall(west_execution_context, "group_name")
