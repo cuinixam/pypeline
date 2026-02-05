@@ -34,9 +34,9 @@ def test_west_remote_creation() -> None:
 def test_west_remote_to_dict() -> None:
     remote = WestRemote(name="origin", url_base="https://github.com/org")
     d = remote.to_dict()
-    # url_base should be serialized with its field name (not alias)
+    # url_base should be serialized with alias (url-base) for west compatibility
     assert d["name"] == "origin"
-    assert d["url_base"] == "https://github.com/org"
+    assert d["url-base"] == "https://github.com/org"
 
 
 def test_west_remote_from_dict() -> None:
@@ -73,6 +73,24 @@ def test_west_dependency_from_dict() -> None:
     assert dep.remote == "origin"
     assert dep.revision == "v3.2.0"
     assert dep.path == "modules/zephyr"
+
+
+def test_west_dependency_clone_depth() -> None:
+    dep = WestDependency(name="zephyr", remote="origin", revision="main", path="modules/zephyr", clone_depth=1)
+    assert dep.clone_depth == 1
+    d = dep.to_dict()
+    assert d["clone-depth"] == 1
+
+
+def test_west_dependency_clone_depth_from_dict() -> None:
+    d = {"name": "zephyr", "remote": "origin", "revision": "main", "path": "modules/zephyr", "clone-depth": 1}
+    dep = WestDependency.from_dict(d)
+    assert dep.clone_depth == 1
+
+
+def test_west_dependency_clone_depth_none_by_default() -> None:
+    dep = WestDependency(name="zephyr", remote="origin", revision="main", path="modules/zephyr")
+    assert dep.clone_depth is None
 
 
 # ============================================================================
@@ -163,6 +181,28 @@ manifest:
 
     assert len(west_manifest.manifest.remotes) == 2
     assert len(west_manifest.manifest.projects) == 2
+
+
+def test_west_manifest_file_with_clone_depth(tmp_path: Path) -> None:
+    manifest_content = """
+manifest:
+  remotes:
+    - name: origin
+      url-base: https://github.com/org
+  projects:
+    - name: zephyr
+      remote: origin
+      revision: main
+      path: modules/zephyr
+      clone-depth: 1
+"""
+    manifest_file = tmp_path / "west.yaml"
+    manifest_file.write_text(manifest_content)
+
+    west_manifest = WestManifestFile.from_file(manifest_file)
+
+    dep = assert_element_of_type(west_manifest.manifest.projects, WestDependency)
+    assert dep.clone_depth == 1
 
 
 # ============================================================================
@@ -349,6 +389,24 @@ def test_west_install_write_manifest_generates_yaml(west_execution_context: Mock
     assert len(parsed["manifest"]["projects"]) == 1
     # Check url-base is converted back (not url_base)
     assert parsed["manifest"]["remotes"][0]["url-base"] == "https://github.com/org"
+
+
+def test_west_install_write_manifest_with_clone_depth(west_execution_context: Mock) -> None:
+    step = WestInstall(west_execution_context, "group_name")
+
+    remote = WestRemote(name="origin", url_base="https://github.com/org")
+    dep = WestDependency(name="dep1", remote="origin", revision="main", path="deps/dep1", clone_depth=1)
+    manifest = WestManifest(remotes=[remote], projects=[dep])
+
+    step._write_west_manifest_file(manifest)
+
+    import yaml
+
+    parsed = yaml.safe_load(step._output_manifest_file.read_text())
+    project = parsed["manifest"]["projects"][0]
+    # Check clone-depth is converted back (not clone_depth)
+    assert project["clone-depth"] == 1
+    assert "clone_depth" not in project
 
 
 def test_west_install_write_manifest_skips_empty(west_execution_context: Mock) -> None:

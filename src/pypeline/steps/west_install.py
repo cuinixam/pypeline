@@ -8,7 +8,7 @@ from typing import Any, Generic, Optional, TypeVar
 import yaml
 from mashumaro.config import BaseConfig
 from mashumaro.mixins.json import DataClassJSONMixin
-from py_app_dev.core.config import BaseConfigDictMixin
+from py_app_dev.core.config import BaseConfigDictMixin as _BaseConfigDictMixin
 from py_app_dev.core.exceptions import UserNotificationException
 from py_app_dev.core.logging import logger
 from yaml.parser import ParserError
@@ -16,6 +16,16 @@ from yaml.scanner import ScannerError
 
 from pypeline.domain.execution_context import ExecutionContext
 from pypeline.domain.pipeline import PipelineStep
+
+
+class BaseConfigDictMixin(_BaseConfigDictMixin):
+    """Local mixin that serializes using field aliases for west.yaml compatibility."""
+
+    class Config(BaseConfig):
+        """Mashumaro configuration with alias serialization."""
+
+        omit_none = True
+        serialize_by_alias = True
 
 
 class BaseConfigJSONMixin(DataClassJSONMixin):
@@ -42,6 +52,8 @@ class WestDependency(BaseConfigDictMixin):
     revision: str
     #: Path where the dependency will be installed
     path: str
+    #: Clone depth for shallow clones (optional, west native support)
+    clone_depth: Optional[int] = field(default=None, metadata={"alias": "clone-depth"})
 
 
 @dataclass
@@ -229,17 +241,7 @@ class WestInstall(PipelineStep[TContext], Generic[TContext]):
             self.logger.info("No West dependencies found. Skipping west.yaml generation.")
             return
 
-        west_config = {
-            "manifest": {
-                "remotes": [remote.to_dict() for remote in manifest.remotes],
-                "projects": [project.to_dict() for project in manifest.projects],
-            }
-        }
-
-        # Convert url_base back to url-base for west compatibility
-        for remote in west_config["manifest"]["remotes"]:
-            if "url_base" in remote:
-                remote["url-base"] = remote.pop("url_base")
+        west_config = {"manifest": manifest.to_dict()}
 
         self._output_manifest_file.parent.mkdir(parents=True, exist_ok=True)
         with open(self._output_manifest_file, "w") as f:

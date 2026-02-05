@@ -174,6 +174,7 @@ pypeline run -i param=value             # Pass input parameters
 - **Cross-platform compatibility**: Always use `pathlib.Path`, handle Windows/Unix differences in `ProjectArtifactsLocator`, and test shell parameter in subprocess execution
 - **CI-agnostic subprocess execution**: ExecutionContext handles PATH manipulation and environment variables uniformly across platforms
 - Package name mismatch: PyPI package is `pypeline-runner`, CLI command is `pypeline`
+- **Mashumaro serialization**: When fields need different key names in output (e.g., `url_base` → `url-base` for YAML), use field aliases with `metadata={"alias": "key-name"}` and create a mixin with `serialize_by_alias = True`. Never manually convert keys after calling `to_dict()`.
 
 ## Coding Guidelines
 
