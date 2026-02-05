@@ -204,6 +204,21 @@ pypeline run -i param=value             # Pass input parameters
 > [!CAUTION]
 > **These rules MUST be followed for all code changes. No exceptions.**
 
+### Plan Before Implementation
+
+1. **Always Present a Plan First**: Before making ANY code changes:
+   - Present a clear implementation plan describing WHAT will be changed and HOW
+   - Wait for explicit user approval before proceeding with implementation
+   - Never jump straight to coding, even for seemingly simple changes
+
+2. **Plan Contents Must Include**:
+   - Files to be modified/created/deleted
+   - Key changes in each file
+   - Any design decisions or trade-offs
+   - Testing approach
+
+3. **No Exceptions**: Even if the user has already discussed an approach, always confirm the plan before execution. The user must explicitly approve before any code is written.
+
 ### Test-First Development
 
 1. **Write Tests Before Implementation**: For any new functionality or bug fix:
