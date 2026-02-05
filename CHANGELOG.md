@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.26.2 (2026-02-05)
+
+### Bug Fixes
+
+- Typer dependency is too strict
+  ([`9a5bf70`](https://github.com/cuinixam/pypeline/commit/9a5bf7018bfacfddd680549da2a0a95921dd0c16))
+
+
 ## v1.26.1 (2026-02-03)
 
 ### Bug Fixes
