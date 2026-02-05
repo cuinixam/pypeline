@@ -1,6 +1,28 @@
 # CHANGELOG
 
 
+## v1.27.0 (2026-02-05)
+
+### Bug Fixes
+
+- West step uses the same deps file
+  ([`ea586ee`](https://github.com/cuinixam/pypeline/commit/ea586ee42437411cf36942cee84bb36e856dbc03))
+
+### Features
+
+- **west**: Add clone depth option
+  ([`d168cc3`](https://github.com/cuinixam/pypeline/commit/d168cc3e160e73a65b90566f9b735c775ecd16b3))
+
+- **west**: Add configurable manifest file path
+  ([`5063f88`](https://github.com/cuinixam/pypeline/commit/5063f882f3f599a7abe68e8977f9a17c0adac269))
+
+Add manifest_file config option to WestInstall step, allowing users to specify custom west manifest
+  file locations. If not configured, defaults to west.yaml in project root (preserving backward
+  compatibility).
+
+Fixes #8
+
+
 ## v1.26.2 (2026-02-05)
 
 ### Bug Fixes

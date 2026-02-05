@@ -17,7 +17,7 @@ for path in ["src", "tests"]:
 project = "Pypeline"
 copyright = "2024, cuinixam"
 author = "cuinixam"
-release = "1.26.2"
+release = "1.27.0"
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
