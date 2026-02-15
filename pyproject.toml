@@ -27,24 +27,25 @@ pypeline = "pypeline.main:main"
 
 [tool.poetry.dependencies]
 python = "^3.10"
-py-app-dev = "^2.19.0"
+py-app-dev = "^2.19"
 typer = "^0"
-pyyaml = "^6.0.3"
-west = "^1.5.0"
+pyyaml = "^6.0"
+west = "^1.5"
+poks = "^0"
 
 [tool.poetry.group.dev.dependencies]
-pytest = "^9.0.2"
-pytest-cov = "^7.0.0"
-pre-commit = "^4.5.1"
+pytest = "^9.0"
+pytest-cov = "^7.0"
+pre-commit = "^4.5"
 ruff = "^0"
 
 [tool.poetry.group.docs.dependencies]
-myst-parser = ">=4.0.0"
-sphinx = ">=8.0.0"
-sphinxcontrib-mermaid = "^2.0.0"
+myst-parser = ">=4.0"
+sphinx = ">=8.0"
+sphinxcontrib-mermaid = "^2.0"
 sphinx-copybutton = "^0"
 sphinx-new-tab-link = "^0"
-sphinx-book-theme = "^1.1.4"
+sphinx-book-theme = "^1.1"
 sphinx-design = "^0"
 
 [tool.semantic_release]

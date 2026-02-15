@@ -29,20 +29,6 @@ class BaseConfigDictMixin(_BaseConfigDictMixin):
         serialize_by_alias = True
 
 
-class BaseConfigJSONMixin(DataClassJSONMixin):
-    class Config(BaseConfig):
-        """Mashumaro configuration for JSON serialization."""
-
-        omit_none = True
-        serialize_by_alias = True
-
-    def to_json_string(self) -> str:
-        return json.dumps(self.to_dict(), indent=2)
-
-    def to_json_file(self, file_path: Path) -> None:
-        file_path.write_text(self.to_json_string())
-
-
 @dataclass
 class WestDependency(BaseConfigDictMixin):
     #: Project name
