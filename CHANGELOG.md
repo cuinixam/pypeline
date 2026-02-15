@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.28.0 (2026-02-15)
+
+### Features
+
+- Add poks step
+  ([`8b39293`](https://github.com/cuinixam/pypeline/commit/8b39293552aab8432e7a197d39c8aef66931aa66))
+
+
 ## v1.27.0 (2026-02-05)
 
 ### Bug Fixes
