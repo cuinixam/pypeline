@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.29.0 (2026-02-22)
+
+### Features
+
+- Add poks progress bars and installation status
+  ([`a552c4d`](https://github.com/cuinixam/pypeline/commit/a552c4d430d20281ceba721c01756c9de8930324))
+
+
 ## v1.28.0 (2026-02-15)
 
 ### Features
