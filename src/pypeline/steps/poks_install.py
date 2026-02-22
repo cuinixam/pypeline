@@ -138,6 +138,10 @@ class PoksInstall(PipelineStep[TContext], Generic[TContext]):
             poks = Poks(root_dir=self._resolve_root_dir())
             result = poks.install(collected)
 
+            self.logger.info("Installed apps:")
+            for app in result.apps:
+                self.logger.info(app.format_status())
+
             self.execution_info.install_dirs.extend(result.dirs)
             self.execution_info.env_vars.update(result.env)
 
