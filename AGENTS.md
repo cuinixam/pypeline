@@ -29,7 +29,7 @@ The architecture follows a clean separation of concerns with three main layers:
 
 **PipelineStep** is the fundamental building block. Every step inherits from `PipelineStep[ExecutionContext]` and implements:
 
-- `run()`: Execute the step's business logic (returns exit code)
+- `run()`: Execute the step's business logic
 - `get_inputs()/get_outputs()`: Declare file dependencies for smart rebuilds (Runnable framework checks these)
 - `update_execution_context()`: Share state with subsequent steps (called **every time**, even if step skipped)
 - `get_needs_dependency_management()`: Return `False` to force step execution regardless of dependencies
@@ -41,6 +41,8 @@ The architecture follows a clean separation of concerns with three main layers:
 - `inputs: Dict[str, Any]`: User parameters from CLI (`-i key=value`) or config defaults
 - `env_vars: Dict[str, Any]`: Environment variables injected into all subprocess calls
 - `create_process_executor()`: Factory method that configures subprocess with PATH/env from context
+
+**Custom Pipelines with `PipelineLoader[T]`**: `PipelineConfig` and `PipelineLoader` are generic — they work with any step base class, not just `PipelineStep`. This enables using pypeline as a library: define your own step base class, implement concrete steps, and use `PipelineLoader[YourBase]` to load them from config (YAML, JSON, or any format that produces a dict). The `ExecutionContext` can be extended to carry domain-specific shared state. See `examples/custom_pipeline.py` and `docs/how_to/use_as_library.md`.
 
 **Dynamic Step Loading** supports three patterns in YAML config:
 
@@ -83,6 +85,12 @@ Pypeline solves the software product line problem where pipelines become tightly
 Follow the template in `src/pypeline/kickstart/templates/project/steps/my_step.py`:
 
 ```python
+from py_app_dev.core.logging import logger
+
+from pypeline.domain.execution_context import ExecutionContext
+from pypeline.domain.pipeline import PipelineStep
+
+
 class MyStep(PipelineStep[ExecutionContext]):
     def run(self) -> None:
         # Access shared state and inputs

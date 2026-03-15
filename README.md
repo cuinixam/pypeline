@@ -48,6 +48,8 @@ Pypeline lets you define your build, test, and deployment pipeline in a single Y
 
 - **Dependency Handling**: Every step can register its dependencies and will only be scheduled if anything has changed.
 
+- **Use as a Library**: `PipelineConfig` and `PipelineLoader[T]` are generic — define your own step base class and use pypeline's infrastructure (config loading, step resolution, shared context) to build custom pipelines for any domain, not just CI/CD. See [Use Pypeline as a Library](https://pypeline-runner.readthedocs.io/en/latest/how_to/use_as_library.html).
+
 ## Installation
 
 Use pipx (or your favorite package manager) to install and run it in an isolated environment:
@@ -130,7 +132,7 @@ pypeline run
 To execute the test suite, call pytest inside Poetry's virtual environment via `poetry run`:
 
 ```shell
-.venv/Scripts/poetry run pytest
+poetry run pytest
 ```
 
 For those using [VS Code](https://code.visualstudio.com/) there are tasks defined for the most common commands:

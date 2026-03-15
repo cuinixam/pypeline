@@ -52,10 +52,10 @@ Core abstractions in `pypeline/domain/`:
 
 | Component | Purpose |
 |-----------|---------|
-| `PipelineStep` | Base class for all steps |
+| `PipelineStep` | Base class for all pipeline steps (built-in and custom) |
 | `ExecutionContext` | Shared state container |
-| `PipelineConfig` | Parsed YAML structure |
-| `PipelineLoader` | Dynamic step class loading |
+| `PipelineConfig` | Parsed step configuration (format-agnostic) |
+| `PipelineLoader[T]` | Generic step class loader — works with any base type, not just `PipelineStep` |
 
 ### 2. Orchestration Layer
 
@@ -79,9 +79,16 @@ Built-in and custom steps:
 | `GenerateEnvSetupScript` | Environment setup script generation |
 | Custom steps | User-defined logic |
 
+## Custom Pipelines
+
+`PipelineConfig` and `PipelineLoader[T]` are generic — they are not coupled to `PipelineStep`. You can define your own step base class with a custom interface and use `PipelineLoader[YourBase]` to load steps from config files or construct them programmatically. This makes pypeline usable as a library for any domain where you need a configurable sequence of operations with shared context.
+
+See [Use Pypeline as a Library](../how_to/use_as_library.md) for a complete example.
+
 ## Design Principles
 
 - **Write once, run anywhere**: Same pipeline on local machine and CI
 - **Python-first**: Steps are Python classes, not shell scripts
 - **Extensible**: Custom steps for domain-specific needs
+- **Library use**: Generic `PipelineLoader[T]` enables custom pipelines beyond CI/CD
 - **Dependency-aware**: Smart rebuilds based on inputs/outputs

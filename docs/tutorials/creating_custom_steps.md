@@ -39,10 +39,15 @@ pipeline:
 Steps can receive configuration from the YAML:
 
 ```python
+from pypeline.domain.execution_context import ExecutionContext
+from pypeline.domain.pipeline import PipelineStep
+
+
 class ConfigurableStep(PipelineStep[ExecutionContext]):
   def run(self) -> None:
-    message = self.config.get("message", "default")
-    count = self.config.get("count", 1)
+    config = self.config or {}
+    message = config.get("message", "default")
+    count = config.get("count", 1)
     for _ in range(count):
       print(message)
 
@@ -64,14 +69,24 @@ pipeline:
 Use `ExecutionContext` to pass data downstream:
 
 ```python
+from pathlib import Path
+
+from pypeline.domain.execution_context import ExecutionContext
+from pypeline.domain.pipeline import PipelineStep
+
+
 class SetupStep(PipelineStep[ExecutionContext]):
+  @property
+  def tool_dir(self) -> Path:
+    return self.output_dir / "tools"
+
   def run(self) -> None:
     # Install tools to a directory
-    self.tool_dir = self.output_dir / "tools"
     self.tool_dir.mkdir(exist_ok=True)
 
   def update_execution_context(self) -> None:
     # Add tool directory to PATH for subsequent steps
+    # Called even when step is skipped, so compute path deterministically
     self.execution_context.add_install_dirs([self.tool_dir])
 ```
 
@@ -95,6 +110,12 @@ class BuildStep(PipelineStep[ExecutionContext]):
 Implement `get_inputs()` and `get_outputs()` for smart rebuilds:
 
 ```python
+from pathlib import Path
+
+from pypeline.domain.execution_context import ExecutionContext
+from pypeline.domain.pipeline import PipelineStep
+
+
 class CompileStep(PipelineStep[ExecutionContext]):
   def run(self) -> None:
     # Compile source files
@@ -114,5 +135,6 @@ The step only runs when inputs are newer than outputs.
 
 ## Next Steps
 
+- [Use Pypeline as a Library](../how_to/use_as_library.md) – Build custom pipelines with your own step base class using generic `PipelineLoader[T]`
 - [Architecture Overview](../explanation/architecture.md) – Understand the execution model
 - [API Reference](../reference/api/index.md) – Full class documentation

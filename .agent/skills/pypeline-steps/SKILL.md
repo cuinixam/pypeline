@@ -1,6 +1,6 @@
 ---
 name: pypeline-steps
-description: Create and run custom pipeline steps using the pypeline framework. Use when creating new PipelineStep classes, accessing ExecutionContext (inputs, data_registry, env_vars), or configuring steps in pypeline.yaml. Covers step configuration, data registry patterns, subprocess execution, and running pipelines.
+description: Create and run custom pipeline steps using the pypeline framework. Use when creating new PipelineStep classes, accessing ExecutionContext (inputs, data_registry, env_vars), or configuring steps in pypeline.yaml. Also use when a user wants to model any sequence of operations as a custom pipeline — PipelineLoader and PipelineConfig are generic (PipelineLoader[T]) so users can define their own step base class, implement concrete steps, and run them with the pipeline machinery (shared context, dependency tracking, YAML config). Covers step configuration, data registry patterns, subprocess execution, custom pipelines, and running pipelines.
 ---
 
 # Pypeline Steps
@@ -183,4 +183,137 @@ Override dependency checking to always run:
 ```python
 def get_needs_dependency_management(self) -> bool:
     return False  # Step always runs
+```
+
+## Custom Pipelines
+
+`PipelineConfig` and `PipelineLoader[T]` are generic — they don't require `PipelineStep`. This means you can model **any sequence of operations** as a custom pipeline with your own step base class, getting shared execution context, YAML-driven configuration, and step dependency tracking without coupling to pypeline's built-in steps.
+
+### Pattern
+
+1. Define your own step base class and execution context
+2. Implement concrete step classes
+3. Use `PipelineLoader[YourBase]` to load steps from YAML (or construct them programmatically)
+4. Instantiate and run each step yourself
+
+### Example
+
+```python
+from abc import ABC, abstractmethod
+from pathlib import Path
+from typing import Any, Optional
+
+from mashumaro import DataClassDictMixin
+from pypeline.domain.execution_context import ExecutionContext as _ExecutionContext
+from pypeline.domain.pipeline import PipelineConfig, PipelineLoader
+
+
+# Extend ExecutionContext to carry custom shared state
+class ExecutionContext(_ExecutionContext):
+    def __init__(self, project_root_dir: Path) -> None:
+        super().__init__(project_root_dir)
+        self.result = 0  # shared state between steps
+
+
+# Your own step base class — no dependency on PipelineStep
+class MyStep(ABC):
+    def __init__(
+        self,
+        execution_context: ExecutionContext,
+        output_dir: Path,
+        config: Optional[dict[str, Any]] = None,
+    ) -> None:
+        self.execution_context = execution_context
+        self.config = config
+        self.output_dir = output_dir
+
+    @abstractmethod
+    def calculate(self, input: int) -> int:
+        pass
+
+
+# Concrete step implementations
+class AddStep(MyStep):
+    def calculate(self, input: int) -> int:
+        param = self.config.get("param", 0) if self.config else 0
+        self.execution_context.result = param + input
+        return self.execution_context.result
+
+
+class MultiplyStep(MyStep):
+    def calculate(self, input: int) -> int:
+        param = self.config.get("param", 1) if self.config else 1
+        self.execution_context.result = param * input
+        return self.execution_context.result
+```
+
+### Loading from a Config File
+
+`PipelineConfig` just needs a dict — the config file format (YAML, JSON, TOML, etc.) is up to you. `StepsConfig` is responsible for parsing the file into a dict.
+
+**Example config (`steps.yaml`):**
+```yaml
+my_steps:
+  - step: AddStep
+    file: my_steps.py
+    config:
+      param: 5
+  - step: MultiplyStep
+    file: my_steps.py
+    config:
+      param: 3
+```
+
+**Same structure as JSON (`steps.json`):**
+```json
+{
+  "my_steps": [
+    {"step": "AddStep", "file": "my_steps.py", "config": {"param": 5}},
+    {"step": "MultiplyStep", "file": "my_steps.py", "config": {"param": 3}}
+  ]
+}
+```
+
+```python
+import json
+import yaml
+
+@dataclass
+class StepsConfig(DataClassDictMixin):
+    my_steps: PipelineConfig
+
+    @classmethod
+    def from_yaml(cls, path: Path) -> "StepsConfig":
+        return cls.from_dict(yaml.safe_load(path.read_text()))
+
+    @classmethod
+    def from_json(cls, path: Path) -> "StepsConfig":
+        return cls.from_dict(json.loads(path.read_text()))
+
+# PipelineLoader[MyStep] — T is your base class
+steps_config = StepsConfig.from_yaml(Path("steps.yaml"))
+step_refs = PipelineLoader[MyStep](steps_config.my_steps, project_root).load_steps_references()
+
+execution_context = ExecutionContext(project_root)
+result = 0
+for ref in step_refs:
+    step = ref._class(execution_context=execution_context, output_dir=project_root, config=ref.config)
+    result = step.calculate(result)
+```
+
+### Constructing Steps Programmatically
+
+Steps don't have to come from YAML — construct references directly:
+
+```python
+my_steps = [
+    (AddStep, {"param": 10}),
+    (MultiplyStep, {"param": 3}),
+    (AddStep, {"param": 2}),
+]
+
+result = 0
+for step_class, config in my_steps:
+    step = step_class(execution_context=execution_context, output_dir=project_root, config=config)
+    result = step.calculate(result)
 ```

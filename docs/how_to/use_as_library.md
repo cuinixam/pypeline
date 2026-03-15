@@ -4,11 +4,14 @@ Load and execute pipeline steps programmatically in your Python code.
 
 ## Overview
 
+`PipelineConfig` and `PipelineLoader[T]` are **generic** — they are not tied to `PipelineStep`. This means you can define your own step base class and use pypeline's infrastructure to build custom pipelines for any domain: data processing, file transformations, firmware image manipulation, or any sequence of operations that benefits from shared context and configurable steps.
+
 You can use pypeline's core classes to:
 
-- Load step definitions from YAML or Python lists
-- Execute steps with a custom `ExecutionContext`
-- Share data between steps via the context
+- Define your own step base class with a custom interface
+- Load step definitions from any format (YAML, JSON, TOML, etc.) — `PipelineConfig` just needs a dict
+- Execute steps with a custom `ExecutionContext` that carries domain-specific state
+- Construct steps programmatically without any config file
 
 ## Complete Example
 
@@ -18,7 +21,6 @@ This example shows two approaches: loading from YAML and from a Python list.
 
 ```python
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional
 
@@ -27,7 +29,6 @@ from pypeline.domain.execution_context import (
 )
 
 
-@dataclass
 class ExecutionContext(_ExecutionContext):
   """Extended context with custom result storage."""
   def __init__(self, project_root_dir: Path) -> None:
@@ -94,7 +95,7 @@ Load and execute:
 import yaml
 from dataclasses import dataclass
 from pathlib import Path
-from mashumaro import DataClassDictMixin
+from mashumaro import DataClassDictMixin  # adds from_dict() deserialization to dataclasses
 from pypeline.domain.pipeline import (
   PipelineConfig,
   PipelineLoader,
@@ -119,8 +120,9 @@ def main() -> None:
     project_root / "steps.yaml"
   )
 
-  # Load step classes
-  step_refs = PipelineLoader(
+  # Load step classes — PipelineLoader[MyStep] resolves classes
+  # matching your custom base type
+  step_refs = PipelineLoader[MyStep](
     steps_config.my_steps,
     project_root
   ).load_steps_references()
@@ -136,7 +138,7 @@ def main() -> None:
     )
     result = step.calculate(result)
 
-  print(f"Result: {result}")  # Output: 12
+  print(f"Result: {result}")  # Output: 10
 ```
 
 ### Load Steps Programmatically
@@ -177,6 +179,31 @@ def run_programmatic() -> None:
 
   print(f"Result: {result}")  # Output: 32
 ```
+
+## Config Format Flexibility
+
+`PipelineConfig` just needs a dict, so the config file format is up to you. The `StepsConfig` class is responsible for parsing the file:
+
+```python
+import json
+import yaml
+
+@dataclass
+class StepsConfig(DataClassDictMixin):
+  my_steps: PipelineConfig
+
+  @classmethod
+  def from_file(cls, config_file: Path) -> "StepsConfig":
+    with open(config_file) as fs:
+      return cls.from_dict(yaml.safe_load(fs))
+
+  @classmethod
+  def from_json(cls, config_file: Path) -> "StepsConfig":
+    with open(config_file) as fs:
+      return cls.from_dict(json.load(fs))
+```
+
+The same step definitions can live in YAML, JSON, or any format that produces a list of dicts with `step`, `file`/`module`, and `config` keys.
 
 ## Key Classes
 
