@@ -3,7 +3,7 @@ pipeline:
     module: pypeline.steps.create_venv
     config:
       package_manager: poetry==2.2.1
-      python_version: 3.13
+      python_version: 3.11
   - step: GenerateEnvSetupScript
     module: pypeline.steps.env_setup_script
   - step: PreCommit
