@@ -51,6 +51,23 @@ def test_run_multiple_steps(artifacts_locator: ProjectArtifactsLocator) -> None:
     assert result.exit_code == 0
 
 
+def test_run_with_command(artifacts_locator: ProjectArtifactsLocator) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            "--project-dir",
+            artifacts_locator.project_root_dir.as_posix(),
+            "--step",
+            "MyStep",
+            "--single",
+            "--command",
+            "python --version",
+        ],
+    )
+    assert result.exit_code == 0
+
+
 def test_run_custom_config_file(artifacts_locator: ProjectArtifactsLocator) -> None:
     artifacts_locator.config_file.unlink()
     assert not artifacts_locator.config_file.exists()

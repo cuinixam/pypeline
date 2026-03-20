@@ -139,6 +139,18 @@ def test_pipeline_create_run_command_step_class(execution_context: ExecutionCont
     assert not len(list(execution_context.project_root_dir.glob("build/my_cmd/*.deps.json"))), "Step dependencies file shall not exist"
 
 
+def test_pipeline_executor_with_command(project: Path) -> None:
+    execution_context = ExecutionContext(project)
+    executor = PipelineStepsExecutor[ExecutionContext](
+        execution_context,
+        [
+            PipelineStepReference("my_cmd", cast(Type[PipelineStep[ExecutionContext]], RunCommandClassFactory._create_run_command_step_class(["echo", "Hello"], "Echo"))),
+        ],
+        command="python --version",
+    )
+    executor.run()
+
+
 @pytest.mark.parametrize(
     "step_names, single, expected_steps",
     [
