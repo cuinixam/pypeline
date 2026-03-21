@@ -482,25 +482,6 @@ class CreateBootstrapEnvironment(Runnable):
         self._create_environment_atomic()
         return 0
 
-    def _is_valid_environment(self) -> bool:
-        """Check if the bootstrap environment exists and is valid."""
-        if not self.marker_file.exists():
-            return False
-
-        try:
-            stored_hash = self.marker_file.read_text().strip()
-            if stored_hash != self.env_hash:
-                logger.info(f"Bootstrap environment hash mismatch: {stored_hash} != {self.env_hash}")
-                return False
-        except OSError:
-            return False
-
-        if not self.virtual_env.pip_path().exists():
-            logger.info("Bootstrap environment pip not found, will recreate.")
-            return False
-
-        return True
-
     def _create_environment_atomic(self) -> None:
         """Create the bootstrap environment, replacing any existing invalid environment."""
         try:
@@ -561,8 +542,7 @@ class CreateBootstrapEnvironment(Runnable):
         return "create-bootstrap-environment"
 
     def get_inputs(self) -> List[Path]:
-        # No file-based inputs for shared bootstrap environment
-        return []
+        return [Path(os.path.realpath(sys.executable))]
 
     def get_outputs(self) -> List[Path]:
         return [self.marker_file]

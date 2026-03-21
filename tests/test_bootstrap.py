@@ -1,3 +1,4 @@
+import os
 import sys
 from pathlib import Path
 from unittest.mock import Mock, call, patch
@@ -316,3 +317,14 @@ def test_check_python_version_compatibility_respects_skip_venv_delete(
     with patch("pypeline.bootstrap.run.shutil.rmtree") as mock_rmtree:
         create_venv._check_python_version_compatibility()
         assert mock_rmtree.called == expect_rmtree_called
+
+
+def test_get_inputs_includes_python_executable(tmp_path: Path) -> None:
+    project_dir = tmp_path / "project"
+    project_dir.mkdir(parents=True)
+    config = BootstrapConfig(package_manager="poetry>=2.1.0")
+    env = CreateBootstrapEnvironment(config, project_dir)
+
+    inputs = env.get_inputs()
+
+    assert Path(os.path.realpath(sys.executable)) in inputs
