@@ -1,6 +1,19 @@
 # CHANGELOG
 
 
+## v1.29.1 (2026-03-21)
+
+### Bug Fixes
+
+- Bootstrap venv not recreated if python interpreter was upgraded
+  ([`568c4ec`](https://github.com/cuinixam/pypeline/commit/568c4ec7275b815d62917f5f9bd97416de3f2f79))
+
+### Documentation
+
+- Add details about custom pipelines
+  ([`e9818c8`](https://github.com/cuinixam/pypeline/commit/e9818c85fb92df2061c4c94fc76e6cc0c8273ee6))
+
+
 ## v1.29.0 (2026-02-22)
 
 ### Features
