@@ -31,7 +31,7 @@ py-app-dev = "^2.19"
 typer = "^0"
 pyyaml = "^6.0"
 west = "^1.5"
-poks = ">=0.9,<1.0"
+poks = ">=0,<1.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^9.0"
