@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.29.2 (2026-03-22)
+
+### Bug Fixes
+
+- The dependency to poks is too strict
+  ([`2257cab`](https://github.com/cuinixam/pypeline/commit/2257cab710de035b66cbafb534aededb7271ea48))
+
+
 ## v1.29.1 (2026-03-21)
 
 ### Bug Fixes
