@@ -35,6 +35,7 @@ pypeline run [OPTIONS]
 | `--force-run` | FLAG | `false` | Force execution ignoring dependencies |
 | `--dry-run` | FLAG | `false` | Show what would run |
 | `-i`, `--input` | TEXT | — | Input as `key=value` (repeatable) |
+| `--command` | TEXT | — | Command to append and execute as a final step after the scheduled pipeline steps |
 
 ### `pypeline --version`
 
@@ -62,3 +63,34 @@ pypeline run -i env=prod -i debug=true
 # Preview without running
 pypeline run --print
 ```
+
+## Running Ad-hoc Commands
+
+After pipeline steps install tools and configure environment variables, you may want to launch a process (like VS Code or a terminal) that inherits all those paths and variables. The `--command` option appends an arbitrary shell command as the final step after the scheduled pipeline steps.
+
+### Examples
+
+**Open VS Code with environment set up by `ScoopInstall`:**
+
+```shell
+pypeline run --step ScoopInstall --command "code ."
+```
+
+**Run the full pipeline, then open a terminal with all paths and env vars:**
+
+```shell
+pypeline run --command "cmd"
+```
+
+**Run up to a specific step in single mode, then execute a command:**
+
+```shell
+pypeline run --step CreateVEnv --single --command "python --version"
+```
+
+### How It Works
+
+1. Pypeline schedules and executes the pipeline steps as usual (filtered by `--step`/`--single` or all steps).
+2. Each step's `update_execution_context()` is called, propagating `install_dirs` and `env_vars`.
+3. After all scheduled steps complete, the `--command` string is used to create a dynamic run step.
+4. The command step inherits the full accumulated `ExecutionContext`, so the subprocess gets all installed tool paths in `PATH` and all environment variables set by prior steps.

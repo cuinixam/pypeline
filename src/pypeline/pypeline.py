@@ -78,12 +78,14 @@ class PipelineStepsExecutor(Generic[TExecutionContext]):
         steps_references: List[PipelineStepReference[PipelineStep[TExecutionContext]]],
         force_run: bool = False,
         dry_run: bool = False,
+        command: Optional[str] = None,
     ) -> None:
         self.logger = logger.bind()
         self.execution_context = execution_context
         self.steps_references = steps_references
         self.force_run = force_run
         self.dry_run = dry_run
+        self.command = command
 
     @property
     def artifacts_locator(self) -> ProjectArtifactsLocator:
@@ -98,6 +100,16 @@ class PipelineStepsExecutor(Generic[TExecutionContext]):
             Executor(step.output_dir, self.force_run, self.dry_run).execute(step)
             # Independent if the step was executed or not, every step shall update the context
             step.update_execution_context()
+
+        if self.command:
+            command_step_reference = PipelineStepReference(
+                None,
+                RunCommandClassFactory._create_run_command_step_class(self.command.split(" "), "CustomCommand"),
+            )
+            command_step = command_step_reference._class(self.execution_context, command_step_reference.group_name, command_step_reference.config)
+            command_step.output_dir.mkdir(parents=True, exist_ok=True)
+            Executor(command_step.output_dir, self.force_run, self.dry_run).execute(command_step)
+            command_step.update_execution_context()
 
         return
 
