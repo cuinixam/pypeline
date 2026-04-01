@@ -79,7 +79,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ github.head_ref || github.ref_name }}
+          ref: ${{ github.event.pull_request.head.sha || github.ref_name }}
+
+      - name: Create local branch for semantic-release
+        if: github.event_name == 'pull_request'
+        run: |
+          git checkout -B "${{ github.head_ref }}"
 
         # Do a dry run of release
       - name: Test release

@@ -35,7 +35,7 @@ def version(
         raise typer.Exit()
 
 
-@app.command()
+@app.command(help="Initialize a new pypeline project with required configuration and files.")
 @time_it("init")
 def init(
     project_dir: Path = typer.Option(Path.cwd().absolute(), help="The project directory"),  # noqa: B008
@@ -44,7 +44,7 @@ def init(
     KickstartProject(project_dir.absolute(), force).run()
 
 
-@app.command()
+@app.command(help="Run the pipeline steps defined in the configuration file.")
 @time_it("run")
 def run(
     project_dir: Path = typer.Option(Path.cwd().absolute(), help="The project directory"),  # noqa: B008,
@@ -87,7 +87,6 @@ def run(
     else:
         inputs_dict = {}
     PipelineStepsExecutor[ExecutionContext](ExecutionContext(project_dir, inputs=inputs_dict), steps_references, force_run, dry_run).run()
-
 
 def main() -> None:
     try:
