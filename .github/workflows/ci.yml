@@ -26,7 +26,7 @@ jobs:
     name: Lint Commit Messages
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - uses: wagoid/commitlint-github-action@v5.4.5
@@ -41,12 +41,12 @@ jobs:
         os:
           - ubuntu-latest
           - windows-latest
-          - macOS-latest
+          - macos-latest
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v5
+        id: setup-python
         with:
           python-version: ${{ matrix.python-version }}
       - uses: snok/install-poetry@v1.3.4
@@ -76,28 +76,28 @@ jobs:
       contents: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.sha || github.ref_name }}
+          ref: ${{ github.sha }}
 
-      - name: Create local branch for semantic-release
-        if: github.event_name == 'pull_request'
+      - name: Checkout commit for release
         run: |
-          git checkout -B "${{ github.head_ref }}"
+          git checkout -B ${{ github.ref_name }} ${{ github.sha }}
 
-        # Do a dry run of release
+      # Do a dry run of PSR
       - name: Test release
-        uses: python-semantic-release/python-semantic-release@v9.16.1
+        uses: python-semantic-release/python-semantic-release@v10
         if: github.ref_name != 'main'
         with:
-          root_options: --noop
+          no_operation_mode: true
+          github_token: noop
 
-        # On main branch: actual release + upload to PyPI & GitHub
+      # On main branch: actual PSR + upload to PyPI & GitHub
       - name: Release
-        uses: python-semantic-release/python-semantic-release@v9.16.1
-        id: release
+        uses: python-semantic-release/python-semantic-release@v10
         if: github.ref_name == 'main'
+        id: release
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
