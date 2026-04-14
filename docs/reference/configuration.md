@@ -68,6 +68,12 @@ One of `module`, `file`, or `run` is required.
 # Or as list
 - step: Test
   run: [pytest, -v, --cov]
+
+# Multiple commands (GitHub Actions style)
+- step: QualityChecks
+  run: |
+    ruff check .
+    pytest -v --cov
 ```
 
 ---

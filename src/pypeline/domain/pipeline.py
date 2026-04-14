@@ -36,7 +36,21 @@ class PipelineStepConfig(DataClassDictMixin):
     module: Optional[str] = None
     #: Step class name
     class_name: Optional[str] = None
-    #: Command to run. For simple steps that don't need a class. Example: run: [echo, 'Hello World!']
+    #: Command to run. For simple steps that don't need a class.
+    #:
+    #: Single command::
+    #:
+    #:     run: ruff check .
+    #:
+    #: Or as list::
+    #:
+    #:     run: [pytest, -v, --cov]
+    #:
+    #: Multiple commands (GitHub Actions style)::
+    #:
+    #:     run: |
+    #:       ruff check .
+    #:       pytest -v --cov
     run: Optional[Union[str, List[str]]] = None
     #: Step description
     description: Optional[str] = None

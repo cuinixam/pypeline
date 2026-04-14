@@ -1,3 +1,4 @@
+import os
 import textwrap
 from pathlib import Path
 from typing import List, OrderedDict, Type, cast
@@ -128,11 +129,120 @@ def test_pipeline_loader_run_command_with_list(tmp_path: Path) -> None:
     executor.run()
 
 
+def test_pipeline_loader_run_multiline(tmp_path: Path, execution_context: Mock) -> None:
+    config_file = tmp_path / "pypeline.yaml"
+    config_file.write_text(
+        textwrap.dedent("""\
+    pipeline:
+        steps:
+            - step: QualityChecks
+              run: |
+                python --version
+                python -c "print('done')"
+    """)
+    )
+    steps_references = (
+        PipelineScheduler[ExecutionContext]
+        .create_pipeline_loader(
+            ProjectConfig.from_file(config_file).pipeline,
+            tmp_path,
+        )
+        .load_steps_references()
+    )
+    step_ref = assert_element_of_type(steps_references, PipelineStepReference)
+    assert step_ref.name == "QualityChecks"
+    executor = PipelineStepsExecutor[ExecutionContext](execution_context, steps_references)
+    executor.run()
+
+    assert execution_context.create_process_executor.call_count == 2
+    assert execution_context.create_process_executor.call_args_list[0].args[0] == ["python", "--version"]
+    expected_arg = "\"print('done')\"" if os.name == "nt" else "print('done')"
+    assert execution_context.create_process_executor.call_args_list[1].args[0] == ["python", "-c", expected_arg]
+    assert execution_context.create_process_executor.return_value.execute.call_count == 2
+
+
+def test_pipeline_loader_run_multiline_skips_empty_lines(tmp_path: Path, execution_context: Mock) -> None:
+    config_file = tmp_path / "pypeline.yaml"
+    config_file.write_text(
+        textwrap.dedent("""\
+    pipeline:
+        steps:
+            - step: MultiCmd
+              run: |
+                python --version
+
+                python -c "print('hello')"
+    """)
+    )
+    steps_references = (
+        PipelineScheduler[ExecutionContext]
+        .create_pipeline_loader(
+            ProjectConfig.from_file(config_file).pipeline,
+            tmp_path,
+        )
+        .load_steps_references()
+    )
+    step_ref = assert_element_of_type(steps_references, PipelineStepReference)
+    assert step_ref.name == "MultiCmd"
+    executor = PipelineStepsExecutor[ExecutionContext](execution_context, steps_references)
+    executor.run()
+
+    assert execution_context.create_process_executor.call_count == 2
+    assert execution_context.create_process_executor.call_args_list[0].args[0] == ["python", "--version"]
+    expected_arg = "\"print('hello')\"" if os.name == "nt" else "print('hello')"
+    assert execution_context.create_process_executor.call_args_list[1].args[0] == ["python", "-c", expected_arg]
+    assert execution_context.create_process_executor.return_value.execute.call_count == 2
+
+
+def test_pipeline_loader_run_empty_block_raises(tmp_path: Path) -> None:
+    config_file = tmp_path / "pypeline.yaml"
+    config_file.write_text(
+        textwrap.dedent("""\
+    pipeline:
+        steps:
+            - step: Empty
+              run: |
+
+    """)
+    )
+    with pytest.raises(UserNotificationException, match="empty `run` block"):
+        PipelineScheduler[ExecutionContext].create_pipeline_loader(
+            ProjectConfig.from_file(config_file).pipeline,
+            tmp_path,
+        ).load_steps_references()
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows-specific backslash handling")
+def test_pipeline_loader_run_preserves_backslashes_on_windows(tmp_path: Path, execution_context: Mock) -> None:
+    config_file = tmp_path / "pypeline.yaml"
+    config_file.write_text(
+        textwrap.dedent("""\
+    pipeline:
+        steps:
+            - step: WinPath
+              run: some-tool C:\\Users\\foo\\bar
+    """)
+    )
+    steps_references = (
+        PipelineScheduler[ExecutionContext]
+        .create_pipeline_loader(
+            ProjectConfig.from_file(config_file).pipeline,
+            tmp_path,
+        )
+        .load_steps_references()
+    )
+    assert_element_of_type(steps_references, PipelineStepReference)
+    executor = PipelineStepsExecutor[ExecutionContext](execution_context, steps_references)
+    executor.run()
+
+    assert execution_context.create_process_executor.call_args_list[0].args[0] == ["some-tool", "C:\\Users\\foo\\bar"]
+
+
 def test_pipeline_create_run_command_step_class(execution_context: ExecutionContext) -> None:
     executor = PipelineStepsExecutor[ExecutionContext](
         execution_context,
         [
-            PipelineStepReference("my_cmd", cast(Type[PipelineStep[ExecutionContext]], RunCommandClassFactory._create_run_command_step_class(["echo 'Hello'"], "Echo"))),
+            PipelineStepReference("my_cmd", cast(Type[PipelineStep[ExecutionContext]], RunCommandClassFactory._create_run_commands_step_class([["echo 'Hello'"]], "Echo"))),
         ],
     )
     executor.run()
