@@ -1,3 +1,5 @@
+import os
+import shlex
 from pathlib import Path
 from typing import (
     Any,
@@ -23,34 +25,39 @@ class RunCommandClassFactory(StepClassFactory[PipelineStep[TExecutionContext]]):
     def create_step_class(self, step_config: PipelineStepConfig, project_root_dir: Path) -> Type[PipelineStep[ExecutionContext]]:
         _ = project_root_dir  # Unused because we do not need to locate files relative to the project root directory
         step_name = step_config.class_name or step_config.step
-        if step_config.run:
-            # We want the run field to always return a list of strings (the command and its arguments).
-            run_command = step_config.run.split(" ") if isinstance(step_config.run, str) else step_config.run
-            return self._create_run_command_step_class(run_command, step_name)
-        raise UserNotificationException(f"Step '{step_name}' has `run` command defined. Please check your pipeline configuration.")
+        if step_config.run is not None:
+            if isinstance(step_config.run, str):
+                lines = [line for line in step_config.run.splitlines() if line.strip()]
+                if not lines:
+                    raise UserNotificationException(f"Step '{step_name}' has an empty `run` block. Please provide at least one command.")
+                commands = [shlex.split(line, posix=(os.name != "nt")) for line in lines]
+            else:
+                commands = [step_config.run]
+            return self._create_run_commands_step_class(commands, step_name)
+        raise UserNotificationException(f"Step '{step_name}' has no `run` command defined. Please check your pipeline configuration.")
 
     @staticmethod
-    def _create_run_command_step_class(command: List[str], name: str) -> Type[PipelineStep[ExecutionContext]]:
-        """Dynamically creates a step class for a given command."""
+    def _create_run_commands_step_class(commands: List[List[str]], name: str) -> Type[PipelineStep[ExecutionContext]]:
+        """Dynamically creates a step class that runs multiple commands sequentially."""
 
-        class TmpDynamicRunCommandStep(PipelineStep[ExecutionContext]):
-            """A simple step that runs a command."""
+        class TmpDynamicRunCommandsStep(PipelineStep[ExecutionContext]):
+            """A simple step that runs multiple commands sequentially."""
 
             def __init__(self, execution_context: ExecutionContext, group_name: str, config: Optional[Dict[str, Any]] = None) -> None:
                 super().__init__(execution_context, group_name, config)
-                self.command = command
+                self.commands = commands
                 self.name = name
 
             def get_needs_dependency_management(self) -> bool:
-                """A command step does not need dependency management."""
+                """A commands step does not need dependency management."""
                 return False
 
             def run(self) -> int:
-                self.execution_context.create_process_executor(
-                    # We have to disable type checking for the command because mypy considers that a List[str] is not compatible with a List[Union[str, Path]] :(
-                    self.command,  # type: ignore
-                    cwd=self.project_root_dir,
-                ).execute()
+                for command in self.commands:
+                    self.execution_context.create_process_executor(
+                        command,  # type: ignore
+                        cwd=self.project_root_dir,
+                    ).execute()
                 return 0
 
             def get_name(self) -> str:
@@ -66,7 +73,7 @@ class RunCommandClassFactory(StepClassFactory[PipelineStep[TExecutionContext]]):
                 pass
 
         # Dynamically create the class with the given name
-        return type(name, (TmpDynamicRunCommandStep,), {})
+        return type(name, (TmpDynamicRunCommandsStep,), {})
 
 
 class PipelineStepsExecutor(Generic[TExecutionContext]):
