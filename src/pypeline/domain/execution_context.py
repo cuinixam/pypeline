@@ -1,9 +1,11 @@
 import os
+import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from py_app_dev.core.data_registry import DataRegistry
+from py_app_dev.core.logging import logger
 from py_app_dev.core.subprocess import SubprocessExecutor
 
 from .artifacts import ProjectArtifactsLocator
@@ -37,6 +39,23 @@ class ExecutionContext:
         # When started from a windows shell (e.g. cmd on Jenkins) the shell parameter must be set to True
         shell = True if os.name == "nt" else False
         return SubprocessExecutor(command, cwd=cwd, env=env, shell=shell)
+
+    def start_detached_process(self, command: List[str | Path], cwd: Optional[Path] = None) -> None:
+        env = os.environ.copy()
+        env.update(self.env_vars)
+        env["PATH"] = os.pathsep.join([path.absolute().as_posix() for path in self.install_dirs] + [env["PATH"]])
+        shell = True if os.name == "nt" else False
+        str_command = [str(c) for c in command]
+        logger.info(f"Starting detached process: {' '.join(str_command)}")
+        creationflags = subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0
+        subprocess.Popen(
+            str_command,
+            cwd=cwd,
+            env=env,
+            shell=shell,
+            creationflags=creationflags,
+            start_new_session=os.name != "nt",
+        )
 
     def create_artifacts_locator(self) -> ProjectArtifactsLocator:
         return ProjectArtifactsLocator(self.project_root_dir)

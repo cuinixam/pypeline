@@ -106,8 +106,6 @@ class PipelineStepsExecutor(Generic[TExecutionContext]):
             # Independent if the step was executed or not, every step shall update the context
             step.update_execution_context()
 
-        return
-
 
 class PipelineScheduler(Generic[TExecutionContext]):
     """

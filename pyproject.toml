@@ -134,6 +134,7 @@ exclude = [
 "setup.py" = ["D100"]
 "conftest.py" = ["D100"]
 "docs/conf.py" = ["D100"]
+"src/pypeline/domain/execution_context.py" = ["S603"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["pypeline", "tests"]

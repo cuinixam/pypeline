@@ -51,6 +51,32 @@ def test_run_multiple_steps(artifacts_locator: ProjectArtifactsLocator) -> None:
     assert result.exit_code == 0
 
 
+@pytest.mark.parametrize(
+    "extra_args",
+    [
+        [],
+        ["--command-detach"],
+    ],
+    ids=["wait", "detach"],
+)
+def test_run_with_command(artifacts_locator: ProjectArtifactsLocator, extra_args: List[str]) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            "--project-dir",
+            artifacts_locator.project_root_dir.as_posix(),
+            "--step",
+            "MyStep",
+            "--single",
+            "--command",
+            "python --version",
+            *extra_args,
+        ],
+    )
+    assert result.exit_code == 0
+
+
 def test_run_custom_config_file(artifacts_locator: ProjectArtifactsLocator) -> None:
     artifacts_locator.config_file.unlink()
     assert not artifacts_locator.config_file.exists()
