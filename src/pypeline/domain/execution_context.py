@@ -1,5 +1,6 @@
 import os
 import subprocess
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -47,7 +48,10 @@ class ExecutionContext:
         shell = True if os.name == "nt" else False
         str_command = [str(c) for c in command]
         logger.info(f"Starting detached process: {' '.join(str_command)}")
-        creationflags = subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0
+        if sys.platform == "win32":
+            creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
+        else:
+            creationflags = 0
         subprocess.Popen(
             str_command,
             cwd=cwd,
