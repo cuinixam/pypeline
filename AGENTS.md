@@ -206,6 +206,7 @@ pypeline run -i param=value             # Pass input parameters
 - Testability: pure functions where possible; pass dependencies, avoid globals/singletons.
 - tests: use `pytest`; keep the tests to a minimum; use parametrized tests when possible; do no add useless comments; the tests shall be self-explanatory.
 - pytest fixtures: use them to avoid code duplication; use `conftest.py` for shared fixtures. Use `tmp_path` in case of file system operations.
+  - Fixtures are for **incidental** setup only (e.g. `tmp_path`, mocked external boundaries) — things you don't care about while reading the assertion. Do **NOT** hide the construction of the **system under test** in a fixture: building the object being tested (and its direct collaborators/config) MUST stay inline in each test, so the test reads top-to-bottom and the subject is visible without hunting up the file. Self-explanatory tests (above) win over de-duplicating one-line SUT construction.
 
 ## Code Quality Rules
 
