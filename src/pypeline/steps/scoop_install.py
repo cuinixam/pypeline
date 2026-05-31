@@ -42,7 +42,11 @@ class ScoopManifest(BaseConfigJSONMixin):
 
 @dataclass
 class ScoopInstallExecutionInfo(BaseConfigJSONMixin):
+    #: Directories that are added to PATH for subsequent steps (bin dirs + env_add_path).
     install_dirs: list[Path] = field(default_factory=list)
+    #: Root directory of every installed app. Tracked only to detect out-of-band uninstalls
+    #: (an app with no bin/env_add_path would otherwise leave nothing to check). NOT added to PATH.
+    dependency_dirs: list[Path] = field(default_factory=list)
     env_vars: dict[str, Any] = field(default_factory=dict)
 
     def to_json_file(self, file_path: Path) -> None:
@@ -153,6 +157,9 @@ class ScoopInstall(PipelineStep[TContext], Generic[TContext]):
             for app in installed_apps:
                 self.logger.debug(f" - {app.name} ({app.version})")
                 self.execution_info.install_dirs.extend(app.get_all_required_paths())
+                # Track the app root so an out-of-band `scoop uninstall` is detected on the next run,
+                # even when the app contributes no PATH directories (e.g. an env-var-only tool).
+                self.execution_info.dependency_dirs.append(app.path)
                 self.execution_info.env_vars.update(app.env_vars)
 
             self.execution_info.to_json_file(self._execution_info_file)
@@ -170,8 +177,9 @@ class ScoopInstall(PipelineStep[TContext], Generic[TContext]):
 
     def get_outputs(self) -> list[Path]:
         outputs: list[Path] = [self._output_manifest_file, self._execution_info_file]
-        if self.execution_info.install_dirs:
-            outputs.extend(self.execution_info.install_dirs)
+        outputs.extend(self.execution_info.install_dirs)
+        # Tracked so the step re-runs if any installed app directory is removed (e.g. uninstalled).
+        outputs.extend(self.execution_info.dependency_dirs)
         return outputs
 
     def update_execution_context(self) -> None:

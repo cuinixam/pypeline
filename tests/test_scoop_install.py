@@ -1,8 +1,8 @@
 import json
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import Mock, patch
 
-from py_app_dev.core.scoop_wrapper import ScoopFileElement
+from py_app_dev.core.scoop_wrapper import InstalledScoopApp, ScoopFileElement, ScoopWrapper
 
 from pypeline.domain.execution_context import ExecutionContext
 from pypeline.main import package_version_file
@@ -166,12 +166,68 @@ def test_scoop_install_run_skips_on_non_windows(tmp_path: Path) -> None:
         assert scoop_install.run() == 0
 
 
-def test_scoop_install_run_executes_on_windows(tmp_path: Path) -> None:
+def test_scoop_install_propagates_install_dirs_and_env_vars(tmp_path: Path) -> None:
+    """Installed apps' PATH directories and environment variables reach the execution context."""
+    (tmp_path / "scoopfile.json").write_text(json.dumps({"apps": [{"Name": "compiler", "Source": "main"}]}))
     exec_context = ExecutionContext(project_root_dir=tmp_path)
     scoop_install = ScoopInstall(exec_context, "install")
 
-    scoop_install._collect_dependencies = MagicMock(return_value=ScoopManifest())  # type: ignore
+    app_root = tmp_path / "scoop" / "apps" / "compiler" / "current"
+    installed_app = InstalledScoopApp(
+        name="compiler",
+        version="1.0.0",
+        path=app_root,
+        bin_dirs=[Path("bin")],
+        env_add_path=[Path("lib")],
+        env_vars={"COMPILER_ROOT": str(app_root)},
+        manifest_file=tmp_path / "manifest.json",
+    )
+    wrapper = Mock(spec=ScoopWrapper)
+    wrapper.install.return_value = [installed_app]
 
     with patch("pypeline.steps.scoop_install.platform.system", return_value="Windows"):
-        assert scoop_install.run() == 0
-        scoop_install._collect_dependencies.assert_called_once()
+        with patch("pypeline.steps.scoop_install.create_scoop_wrapper", return_value=wrapper):
+            assert scoop_install.run() == 0
+
+    scoop_install.update_execution_context()
+
+    # bin_dirs and env_add_path are resolved against the app root and added to PATH.
+    assert app_root / "bin" in exec_context.install_dirs
+    assert app_root / "lib" in exec_context.install_dirs
+    # Environment variables declared by the app are propagated too.
+    assert exec_context.env_vars["COMPILER_ROOT"] == str(app_root)
+
+
+def test_scoop_install_tracks_app_dir_without_adding_to_path(tmp_path: Path) -> None:
+    """
+    Regression for #13: an env-var-only app (no PATH dirs) must still be tracked as an output.
+
+    Its install directory is recorded so an out-of-band `scoop uninstall` is detected on the
+    next run, but the app root must NOT be added to the execution context install dirs (PATH).
+    """
+    (tmp_path / "scoopfile.json").write_text(json.dumps({"apps": [{"Name": "mytool", "Source": "main"}]}))
+    exec_context = ExecutionContext(project_root_dir=tmp_path)
+    scoop_install = ScoopInstall(exec_context, "install")
+
+    app_dir = tmp_path / "scoop" / "apps" / "mytool" / "current"
+    installed_app = InstalledScoopApp(
+        name="mytool",
+        version="1.0.0",
+        path=app_dir,
+        bin_dirs=[],  # no bin directories
+        env_add_path=[],  # no directories added to PATH
+        env_vars={"MYTOOL_ROOT": str(app_dir)},
+        manifest_file=tmp_path / "manifest.json",
+    )
+    wrapper = Mock(spec=ScoopWrapper)
+    wrapper.install.return_value = [installed_app]
+
+    with patch("pypeline.steps.scoop_install.platform.system", return_value="Windows"):
+        with patch("pypeline.steps.scoop_install.create_scoop_wrapper", return_value=wrapper):
+            assert scoop_install.run() == 0
+
+    # The app root is tracked as an output, so removing it (uninstall) re-triggers the step.
+    assert app_dir in scoop_install.get_outputs()
+    # ...but it is not propagated as an install dir, so it never lands on PATH.
+    scoop_install.update_execution_context()
+    assert app_dir not in exec_context.install_dirs
