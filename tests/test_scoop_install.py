@@ -2,6 +2,8 @@ import json
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+import pytest
+from py_app_dev.core.exceptions import UserNotificationException
 from py_app_dev.core.scoop_wrapper import InstalledScoopApp, ScoopFileElement, ScoopWrapper
 
 from pypeline.domain.execution_context import ExecutionContext
@@ -66,7 +68,11 @@ def test_scoop_manifest_file_from_file(tmp_path: Path) -> None:
 
 
 def test_scoop_install_execution_info_serialization(tmp_path: Path) -> None:
-    execution_info = ScoopInstallExecutionInfo(install_dirs=[tmp_path / "app1", tmp_path / "app2"], env_vars={"PATH": "/usr/bin", "EDITOR": "vim"})
+    execution_info = ScoopInstallExecutionInfo(
+        install_dirs=[tmp_path / "app1", tmp_path / "app2"],
+        dependency_dirs=[tmp_path / "app3"],
+        env_vars={"PATH": "/usr/bin", "EDITOR": "vim"},
+    )
 
     info_file = tmp_path / "execution_info.json"
     execution_info.to_json_file(info_file)
@@ -76,6 +82,7 @@ def test_scoop_install_execution_info_serialization(tmp_path: Path) -> None:
     assert len(loaded_info.install_dirs) == 2
     assert tmp_path / "app1" in loaded_info.install_dirs
     assert tmp_path / "app2" in loaded_info.install_dirs
+    assert loaded_info.dependency_dirs == [tmp_path / "app3"]
     assert loaded_info.env_vars["PATH"] == "/usr/bin"
     assert loaded_info.env_vars["EDITOR"] == "vim"
 
@@ -107,6 +114,38 @@ def test_scoop_install_with_global_scoopfile(tmp_path: Path) -> None:
     assert len(collected.apps) == 1
     assert collected.apps[0].name == "global_app"
     assert collected.apps[0].version == "1.0.0"
+
+
+def test_scoop_install_raises_on_corrupt_scoopfile(tmp_path: Path) -> None:
+    (tmp_path / "scoopfile.json").write_text("{ this is not valid json")
+    exec_context = ExecutionContext(project_root_dir=tmp_path)
+    scoop_install = ScoopInstall(exec_context, "install")
+
+    with pytest.raises(UserNotificationException):
+        scoop_install._collect_dependencies()
+
+
+def test_scoop_install_merges_multiple_sources(tmp_path: Path) -> None:
+    """A subclass can contribute additional manifest sources; buckets and apps from all sources merge."""
+    source_content = {"buckets": [{"Name": "main", "Source": "https://github.com/ScoopInstaller/Main"}], "apps": [{"Name": "git", "Source": "main"}]}
+    (tmp_path / "scoopfile.json").write_text(json.dumps(source_content))
+    extra_manifest = tmp_path / "extra.json"
+    extra_content = {"buckets": [{"Name": "extras", "Source": "https://github.com/ScoopInstaller/Extras"}], "apps": [{"Name": "vscode", "Source": "extras"}]}
+    extra_manifest.write_text(json.dumps(extra_content))
+
+    class MultiSourceScoopInstall(ScoopInstall[ExecutionContext]):
+        def _collect_dependencies(self) -> ScoopManifest:
+            manifest = super()._collect_dependencies()
+            extra = ScoopManifest.from_file(extra_manifest)
+            self._merge_buckets(manifest, extra.buckets)
+            self._merge_apps(manifest, extra.apps)
+            return manifest
+
+    scoop_install = MultiSourceScoopInstall(ExecutionContext(project_root_dir=tmp_path), "install")
+    collected = scoop_install._collect_dependencies()
+
+    assert {bucket.name for bucket in collected.buckets} == {"main", "extras"}
+    assert {app.name for app in collected.apps} == {"git", "vscode"}
 
 
 def test_scoop_install_merges_buckets_with_conflicts(tmp_path: Path) -> None:
@@ -141,6 +180,19 @@ def test_scoop_install_merges_apps_avoids_duplicates(tmp_path: Path) -> None:
     scoop_install._merge_apps(target, source_apps)
 
     assert {app.name for app in target.apps} == {"git", "vscode"}
+
+
+def test_scoop_install_merges_apps_keeps_existing_on_version_conflict(tmp_path: Path) -> None:
+    exec_context = ExecutionContext(project_root_dir=tmp_path)
+    scoop_install = ScoopInstall(exec_context, "install")
+
+    target = ScoopManifest(apps=[ScoopFileElement.from_dict({"name": "git", "source": "main", "version": "2.42.0"})])
+    conflicting = [ScoopFileElement.from_dict({"name": "git", "source": "main", "version": "2.43.0"})]
+
+    scoop_install._merge_apps(target, conflicting)
+
+    assert len(target.apps) == 1
+    assert target.apps[0].version == "2.42.0"
 
 
 def test_scoop_install_get_inputs_includes_package_version_file(tmp_path: Path) -> None:
@@ -196,6 +248,26 @@ def test_scoop_install_propagates_install_dirs_and_env_vars(tmp_path: Path) -> N
     assert app_root / "lib" in exec_context.install_dirs
     # Environment variables declared by the app are propagated too.
     assert exec_context.env_vars["COMPILER_ROOT"] == str(app_root)
+
+
+def test_scoop_install_generates_output_manifest(tmp_path: Path) -> None:
+    """run() writes the collected dependencies as a scoopfile.json into the output dir before installing."""
+    source_content = {"buckets": [{"Name": "main", "Source": "https://github.com/ScoopInstaller/Main"}], "apps": [{"Name": "git", "Source": "main"}]}
+    (tmp_path / "scoopfile.json").write_text(json.dumps(source_content))
+    exec_context = ExecutionContext(project_root_dir=tmp_path)
+    scoop_install = ScoopInstall(exec_context, "install")
+
+    wrapper = Mock(spec=ScoopWrapper)
+    wrapper.install.return_value = []
+
+    with patch("pypeline.steps.scoop_install.platform.system", return_value="Windows"):
+        with patch("pypeline.steps.scoop_install.create_scoop_wrapper", return_value=wrapper):
+            assert scoop_install.run() == 0
+
+    generated = ScoopManifest.from_file(scoop_install._output_manifest_file)
+    assert {bucket.name for bucket in generated.buckets} == {"main"}
+    assert {app.name for app in generated.apps} == {"git"}
+    wrapper.install.assert_called_once_with(scoop_install._output_manifest_file)
 
 
 def test_scoop_install_tracks_app_dir_without_adding_to_path(tmp_path: Path) -> None:
