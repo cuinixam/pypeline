@@ -94,12 +94,9 @@ class ScoopInstall(PipelineStep[TContext], Generic[TContext]):
         collected_manifest = ScoopManifest()
 
         if self._source_manifest_file.exists():
-            try:
-                source_manifest = ScoopManifest.from_file(self._source_manifest_file)
-                self._merge_buckets(collected_manifest, source_manifest.buckets)
-                self._merge_apps(collected_manifest, source_manifest.apps)
-            except Exception as e:
-                self.logger.warning(f"Failed to parse source scoopfile.json: {e}")
+            source_manifest = ScoopManifest.from_file(self._source_manifest_file)
+            self._merge_buckets(collected_manifest, source_manifest.buckets)
+            self._merge_apps(collected_manifest, source_manifest.apps)
 
         return collected_manifest
 
@@ -119,10 +116,19 @@ class ScoopInstall(PipelineStep[TContext], Generic[TContext]):
                 )
 
     def _merge_apps(self, target_manifest: ScoopManifest, source_apps: list[ScoopFileElement]) -> None:
-        """Merge apps, avoiding duplicates."""
+        """Merge apps, warning when the same app is declared with a different source or version."""
         for app in source_apps:
-            if app not in target_manifest.apps:
+            existing_app = next((a for a in target_manifest.apps if a.name == app.name), None)
+
+            if existing_app is None:
                 target_manifest.apps.append(app)
+            elif existing_app != app:
+                self.logger.warning(
+                    f"App '{app.name}' defined multiple times with different definitions:\n"
+                    f"  Existing: source={existing_app.source}, version={existing_app.version}\n"
+                    f"  New: source={app.source}, version={app.version}\n"
+                    f"  Keeping existing definition."
+                )
 
     def _generate_scoop_manifest(self, manifest: ScoopManifest) -> None:
         """Generate scoopfile.json file from collected dependencies."""
@@ -142,30 +148,28 @@ class ScoopInstall(PipelineStep[TContext], Generic[TContext]):
             self.logger.warning(f"ScoopInstall step is only supported on Windows. Skipping. Current platform: {platform.system()}")
             return 0
 
+        collected_manifest = self._collect_dependencies()
+        self._generate_scoop_manifest(collected_manifest)
+
+        if not collected_manifest.apps:
+            self.logger.info("No Scoop dependencies to install.")
+            return 0
+
         try:
-            collected_manifest = self._collect_dependencies()
-
-            self._generate_scoop_manifest(collected_manifest)
-
-            if not collected_manifest.apps:
-                self.logger.info("No Scoop dependencies to install.")
-                return 0
-
             installed_apps = create_scoop_wrapper().install(self._output_manifest_file)
-
-            self.logger.debug("Installed apps:")
-            for app in installed_apps:
-                self.logger.debug(f" - {app.name} ({app.version})")
-                self.execution_info.install_dirs.extend(app.get_all_required_paths())
-                # Track the app root so an out-of-band `scoop uninstall` is detected on the next run,
-                # even when the app contributes no PATH directories (e.g. an env-var-only tool).
-                self.execution_info.dependency_dirs.append(app.path)
-                self.execution_info.env_vars.update(app.env_vars)
-
-            self.execution_info.to_json_file(self._execution_info_file)
-
         except Exception as e:
             raise UserNotificationException(f"Failed to install scoop dependencies: {e}") from e
+
+        self.logger.debug("Installed apps:")
+        for app in installed_apps:
+            self.logger.debug(f" - {app.name} ({app.version})")
+            self.execution_info.install_dirs.extend(app.get_all_required_paths())
+            # Track the app root so an out-of-band `scoop uninstall` is detected on the next run,
+            # even when the app contributes no PATH directories (e.g. an env-var-only tool).
+            self.execution_info.dependency_dirs.append(app.path)
+            self.execution_info.env_vars.update(app.env_vars)
+
+        self.execution_info.to_json_file(self._execution_info_file)
 
         return 0
 
