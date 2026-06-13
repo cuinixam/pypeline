@@ -19,7 +19,7 @@ from typing import (
     Union,
 )
 
-from mashumaro import DataClassDictMixin
+from py_app_dev.core.config import ConfigElement
 from py_app_dev.core.exceptions import UserNotificationException
 from py_app_dev.core.runnable import Runnable
 
@@ -27,7 +27,7 @@ from .execution_context import ExecutionContext
 
 
 @dataclass
-class PipelineStepConfig(DataClassDictMixin):
+class PipelineStepConfig(ConfigElement):
     #: Step name or class name if file is not specified
     step: str
     #: Path to file with step class

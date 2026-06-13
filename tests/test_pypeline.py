@@ -364,6 +364,62 @@ def test_pipeline_exchange_information_between_steps(project: Path) -> None:
     assert len(my_data) == 1, "MyData shall be inserted in the data registry"
 
 
+def test_project_config_records_source_location(tmp_path: Path) -> None:
+    config_file = tmp_path / "pypeline.yaml"
+    config_file.write_text(
+        textwrap.dedent("""\
+            pipeline:
+                - step: Echo
+                  run: echo "Hello"
+            """)
+    )
+    project_config = ProjectConfig.from_file(config_file)
+    assert project_config.file == config_file
+    assert project_config.location is not None and project_config.location.file == config_file
+    step = cast(List[PipelineStepConfig], project_config.pipeline)[0]
+    assert step.location is not None
+    assert (step.location.file, step.location.line) == (config_file, 2)
+
+
+def test_malformed_step_reports_its_location(tmp_path: Path) -> None:
+    config_file = tmp_path / "pypeline.yaml"
+    config_file.write_text(
+        textwrap.dedent("""\
+            pipeline:
+                - step: Good
+                  run: echo "Hello"
+                - step: Bad
+                  timeout_sec: not-a-number
+            """)
+    )
+    with pytest.raises(UserNotificationException) as exc_info:
+        ProjectConfig.from_file(config_file)
+    # The error points at the offending step (line 4), not the top of the file.
+    assert f"{config_file}:4:" in str(exc_info.value)
+
+
+def test_malformed_input_reports_its_location(tmp_path: Path) -> None:
+    config_file = tmp_path / "pypeline.yaml"
+    config_file.write_text(
+        textwrap.dedent("""\
+            inputs:
+                env:
+                    type: not-a-valid-type
+            pipeline:
+                - step: Echo
+                  run: echo "Hello"
+            """)
+    )
+    with pytest.raises(UserNotificationException) as exc_info:
+        ProjectConfig.from_file(config_file)
+    assert f"{config_file}:3:" in str(exc_info.value)
+
+
+def test_missing_config_file_raises_file_not_found(tmp_path: Path) -> None:
+    with pytest.raises(FileNotFoundError):
+        ProjectConfig.from_file(tmp_path / "does_not_exist.yaml")
+
+
 @pytest.fixture
 def sample_steps() -> List[PipelineStepConfig]:
     """Sample pipeline steps for testing."""

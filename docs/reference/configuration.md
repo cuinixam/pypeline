@@ -22,6 +22,10 @@ pipeline:
       ...
 ```
 
+```{note}
+A malformed `pypeline.yaml` (a wrong type or a missing required field) is reported with its exact `file:line:column`, pointing at the offending step or input instead of the top of the file, so you can jump straight to it.
+```
+
 ## Step Configuration
 
 | Field | Type | Required | Description |
