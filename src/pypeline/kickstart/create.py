@@ -1,4 +1,5 @@
 import shutil
+import sys
 from pathlib import Path
 from typing import List, Optional, Union
 
@@ -53,3 +54,10 @@ class KickstartProject:
             project_builder.with_disable_target_directory_check()
         project_builder.with_dir("project")
         project_builder.build()
+        self._pin_python_version()
+
+    def _pin_python_version(self) -> None:
+        """Pin the generated config's python_version to the interpreter running `init`, so the bootstrap env is stable."""
+        config_file = self.project_dir / "pypeline.yaml"
+        version = f"{sys.version_info.major}.{sys.version_info.minor}"
+        config_file.write_text(config_file.read_text().replace("{{PYTHON_VERSION}}", version))

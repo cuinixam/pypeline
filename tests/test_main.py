@@ -1,3 +1,4 @@
+import sys
 import textwrap
 from pathlib import Path
 from typing import List
@@ -158,6 +159,16 @@ def test_init_default(kickstart_files: List[str], tmp_path: Path) -> None:
 
     result = runner.invoke(app, ["run", "--project-dir", tmp_path.as_posix()])
     assert result.exit_code == 0
+
+
+def test_init_pins_python_version_to_current_interpreter(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["init", "--project-dir", tmp_path.as_posix()])
+    assert result.exit_code == 0
+
+    generated = tmp_path.joinpath("pypeline.yaml").read_text()
+    # The generated config pins python_version (stable bootstrap env) and drops python_executable.
+    assert f'python_version: "{sys.version_info.major}.{sys.version_info.minor}"' in generated
+    assert "python_executable" not in generated
 
 
 def test_init_with_force_in_non_empty_directory(project: Path, kickstart_files: List[str]) -> None:

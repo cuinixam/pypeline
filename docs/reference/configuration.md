@@ -125,8 +125,8 @@ Creates a Python virtual environment.
 
 | Config | Type | Default | Description |
 |--------|------|---------|-------------|
-| `python_version` | string | — | Python version (e.g., `"3.13"`) |
-| `python_executable` | string | — | Path to Python |
+| `python_version` | string | — | Python version (e.g., `"3.13"`) — **preferred** |
+| `python_executable` | string | — | Path to Python (legacy; prefer `python_version`) |
 | `python_package_manager` | string | `uv>=0.6` | Package manager |
 | `bootstrap_script` | string | — | Custom bootstrap script |
 
@@ -136,6 +136,10 @@ Creates a Python virtual environment.
   config:
     python_version: "3.13"
     python_package_manager: uv>=0.6
+```
+
+```{note}
+Prefer `python_version` over `python_executable`. The bootstrap environment is cached per Python `major.minor`; pinning `python_version` keeps that identity stable, while relying on a bare `python_executable` (e.g. `python3`) lets it drift with `PATH` between steps and rebuild needlessly. New projects from `pypeline init` pin `python_version` to the interpreter that created them.
 ```
 
 ### WestInstall

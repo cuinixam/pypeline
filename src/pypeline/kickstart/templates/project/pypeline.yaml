@@ -8,7 +8,7 @@ pipeline:
   - step: CreateVEnv
     module: pypeline.steps.create_venv
     config:
-      python_executable: python3
+      python_version: "{{PYTHON_VERSION}}"
       python_package_manager: uv>=0.9
   - step: WestInstall
     module: pypeline.steps.west_install
