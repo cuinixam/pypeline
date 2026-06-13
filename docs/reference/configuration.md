@@ -82,6 +82,41 @@ One of `module`, `file`, or `run` is required.
 
 ---
 
+## Including Other Pipeline Files
+
+A `pipeline` entry can pull in the steps of another pypeline file with `include:` instead of `step:`. The included steps are spliced in **at that position**, so where the `include` sits is where its steps run:
+
+```yaml
+# pypeline.yaml
+pipeline:
+  - include: bootstrap.pypeline.yaml   # its steps run here, before the rest
+  - step: Build
+    run: cmake --build build
+```
+
+```yaml
+# bootstrap.pypeline.yaml — a valid pypeline file on its own
+pipeline:
+  - step: CreateVEnv
+    module: pypeline.steps.create_venv
+  - step: InstallDeps
+    run: uv sync
+```
+
+- **Path** is resolved relative to the **including** file. Includes may be nested (an included file may include another); a cycle is reported as an error.
+- **The included file must define a flat list** of steps (no groups).
+- **A fragment runs both ways.** `bootstrap.pypeline.yaml` is a normal pypeline file, so you can run it on its own (`pypeline run --config-file bootstrap.pypeline.yaml`) *and* include it.
+
+```{important}
+A step's output directory is determined by the file where the step is **defined**, never by the file that includes it. So a step produces the same outputs — and reuses the same incremental cache — whether you run its file standalone or as part of a larger pipeline. Splicing an include into a group changes execution order only, not where the included steps write.
+```
+
+```{note}
+Includes do not defer step-class resolution: a fragment that *installs* the package providing a **later** step cannot bootstrap that step in the same run (the later step's class must already be importable). Use `include:` to organise and reuse steps whose classes are already available.
+```
+
+---
+
 ## Built-in Steps
 
 ### CreateVEnv

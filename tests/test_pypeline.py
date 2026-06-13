@@ -1,7 +1,7 @@
 import os
 import textwrap
 from pathlib import Path
-from typing import List, OrderedDict, Type, cast
+from typing import List, Optional, OrderedDict, Type, cast
 from unittest.mock import Mock
 
 import pytest
@@ -418,6 +418,216 @@ def test_malformed_input_reports_its_location(tmp_path: Path) -> None:
 def test_missing_config_file_raises_file_not_found(tmp_path: Path) -> None:
     with pytest.raises(FileNotFoundError):
         ProjectConfig.from_file(tmp_path / "does_not_exist.yaml")
+
+
+def _loaded_group_of(config_file: Path, step_name: str) -> Optional[str]:
+    """The output group a loaded step resolves to (the value that drives output_dir)."""
+    references = (
+        PipelineScheduler[ExecutionContext]
+        .create_pipeline_loader(ProjectConfig.from_file(config_file).pipeline, config_file.parent)
+        .load_steps_references()
+    )
+    return next(ref.group_name for ref in references if ref.name == step_name)
+
+
+def test_included_step_output_group_is_identical_standalone_and_included(tmp_path: Path) -> None:
+    # The invariant: a fragment's step must land in the same output dir whether the fragment
+    # is run on its own or spliced into a group of a larger pipeline, so its cache is shared.
+    fragment = tmp_path / "bootstrap.pypeline.yaml"
+    fragment.write_text(
+        textwrap.dedent("""\
+            pipeline:
+                - step: Bootstrap
+                  run: echo "bootstrap"
+            """)
+    )
+    main = tmp_path / "pypeline.yaml"
+    main.write_text(
+        textwrap.dedent("""\
+            pipeline:
+                setup:
+                    - include: bootstrap.pypeline.yaml
+                build:
+                    - step: Build
+                      run: echo "build"
+            """)
+    )
+    # Standalone: the flat fragment puts Bootstrap in no group.
+    assert _loaded_group_of(fragment, "Bootstrap") is None
+    # Included into the 'setup' group: the parent group must NOT reach Bootstrap's output identity.
+    assert _loaded_group_of(main, "Bootstrap") is None
+    # The main pipeline's own grouped step is unaffected.
+    assert _loaded_group_of(main, "Build") == "build"
+
+
+def test_single_file_grouped_output_group_unchanged(tmp_path: Path) -> None:
+    # Regression guard: with no includes, a grouped step's output group is its declared group.
+    config_file = tmp_path / "pypeline.yaml"
+    config_file.write_text(
+        textwrap.dedent("""\
+            pipeline:
+                gen:
+                    - step: Generate
+                      run: echo "gen"
+            """)
+    )
+    assert _loaded_group_of(config_file, "Generate") == "gen"
+
+
+def test_include_splices_in_position_order(tmp_path: Path) -> None:
+    fragment = tmp_path / "bootstrap.pypeline.yaml"
+    fragment.write_text(
+        textwrap.dedent("""\
+            pipeline:
+                - step: CreateVEnv
+                  run: echo "venv"
+                - step: InstallDeps
+                  run: echo "deps"
+            """)
+    )
+    main = tmp_path / "pypeline.yaml"
+    main.write_text(
+        textwrap.dedent("""\
+            pipeline:
+                - step: Before
+                  run: echo "before"
+                - include: bootstrap.pypeline.yaml
+                - step: After
+                  run: echo "after"
+            """)
+    )
+    references = (
+        PipelineScheduler[ExecutionContext]
+        .create_pipeline_loader(ProjectConfig.from_file(main).pipeline, tmp_path)
+        .load_steps_references()
+    )
+    assert [ref.name for ref in references] == ["Before", "CreateVEnv", "InstallDeps", "After"]
+
+
+def test_transitive_include(tmp_path: Path) -> None:
+    (tmp_path / "c.pypeline.yaml").write_text(
+        textwrap.dedent("""\
+            pipeline:
+                - step: C
+                  run: echo "c"
+            """)
+    )
+    (tmp_path / "b.pypeline.yaml").write_text(
+        textwrap.dedent("""\
+            pipeline:
+                - include: c.pypeline.yaml
+                - step: B
+                  run: echo "b"
+            """)
+    )
+    main = tmp_path / "pypeline.yaml"
+    main.write_text(
+        textwrap.dedent("""\
+            pipeline:
+                - include: b.pypeline.yaml
+                - step: A
+                  run: echo "a"
+            """)
+    )
+    references = (
+        PipelineScheduler[ExecutionContext]
+        .create_pipeline_loader(ProjectConfig.from_file(main).pipeline, tmp_path)
+        .load_steps_references()
+    )
+    assert [ref.name for ref in references] == ["C", "B", "A"]
+
+
+def test_include_cycle_raises(tmp_path: Path) -> None:
+    (tmp_path / "a.pypeline.yaml").write_text("pipeline:\n  - include: b.pypeline.yaml\n")
+    (tmp_path / "b.pypeline.yaml").write_text("pipeline:\n  - include: a.pypeline.yaml\n")
+    with pytest.raises(UserNotificationException, match="(?i)circular|cycle"):
+        ProjectConfig.from_file(tmp_path / "a.pypeline.yaml")
+
+
+def test_include_path_is_relative_to_including_file(tmp_path: Path) -> None:
+    sub = tmp_path / "fragments"
+    sub.mkdir()
+    (sub / "tools.pypeline.yaml").write_text(
+        textwrap.dedent("""\
+            pipeline:
+                - include: install.pypeline.yaml
+            """)
+    )
+    (sub / "install.pypeline.yaml").write_text(
+        textwrap.dedent("""\
+            pipeline:
+                - step: Install
+                  run: echo "install"
+            """)
+    )
+    main = tmp_path / "pypeline.yaml"
+    main.write_text(
+        textwrap.dedent("""\
+            pipeline:
+                - include: fragments/tools.pypeline.yaml
+            """)
+    )
+    references = (
+        PipelineScheduler[ExecutionContext]
+        .create_pipeline_loader(ProjectConfig.from_file(main).pipeline, tmp_path)
+        .load_steps_references()
+    )
+    assert [ref.name for ref in references] == ["Install"]
+
+
+def test_included_step_carries_fragment_provenance(tmp_path: Path) -> None:
+    fragment = tmp_path / "bootstrap.pypeline.yaml"
+    fragment.write_text(
+        textwrap.dedent("""\
+            pipeline:
+                - step: Bootstrap
+                  run: echo "bootstrap"
+            """)
+    )
+    main = tmp_path / "pypeline.yaml"
+    main.write_text(
+        textwrap.dedent("""\
+            pipeline:
+                - include: bootstrap.pypeline.yaml
+            """)
+    )
+    steps = cast(List[PipelineStepConfig], ProjectConfig.from_file(main).pipeline)
+    assert steps[0].step == "Bootstrap"
+    assert steps[0].location is not None and steps[0].location.file == fragment
+
+
+def test_grouped_fragment_is_rejected(tmp_path: Path) -> None:
+    (tmp_path / "grouped.pypeline.yaml").write_text(
+        textwrap.dedent("""\
+            pipeline:
+                setup:
+                    - step: Setup
+                      run: echo "setup"
+            """)
+    )
+    main = tmp_path / "pypeline.yaml"
+    main.write_text(
+        textwrap.dedent("""\
+            pipeline:
+                - include: grouped.pypeline.yaml
+            """)
+    )
+    with pytest.raises(UserNotificationException, match="(?i)flat|group"):
+        ProjectConfig.from_file(main)
+
+
+@pytest.mark.parametrize(
+    "entry",
+    [
+        "- step: Both\n      include: other.pypeline.yaml\n      run: echo hi",  # step + include
+        "- description: neither a step nor an include",  # neither
+    ],
+)
+def test_invalid_pipeline_entry_is_rejected(tmp_path: Path, entry: str) -> None:
+    config_file = tmp_path / "pypeline.yaml"
+    config_file.write_text(f"pipeline:\n    {entry}\n")
+    with pytest.raises(UserNotificationException):
+        ProjectConfig.from_file(config_file)
 
 
 @pytest.fixture

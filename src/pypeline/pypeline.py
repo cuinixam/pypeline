@@ -25,6 +25,8 @@ class RunCommandClassFactory(StepClassFactory[PipelineStep[TExecutionContext]]):
     def create_step_class(self, step_config: PipelineStepConfig, project_root_dir: Path) -> Type[PipelineStep[ExecutionContext]]:
         _ = project_root_dir  # Unused because we do not need to locate files relative to the project root directory
         step_name = step_config.class_name or step_config.step
+        if not step_name:
+            raise UserNotificationException("A pipeline step must define a 'step' name. Please check your pipeline configuration.")
         if step_config.run is not None:
             if isinstance(step_config.run, str):
                 lines = [line for line in step_config.run.splitlines() if line.strip()]

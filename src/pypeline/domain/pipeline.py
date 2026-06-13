@@ -1,6 +1,6 @@
 import importlib
 from abc import abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 from typing import (
@@ -29,7 +29,9 @@ from .execution_context import ExecutionContext
 @dataclass
 class PipelineStepConfig(ConfigElement):
     #: Step name or class name if file is not specified
-    step: str
+    step: Optional[str] = None
+    #: Path to another pypeline file whose steps are spliced in at this position (instead of a step)
+    include: Optional[str] = None
     #: Path to file with step class
     file: Optional[str] = None
     #: Python module with step class
@@ -58,6 +60,26 @@ class PipelineStepConfig(ConfigElement):
     timeout_sec: Optional[int] = None
     #: Custom step configuration
     config: Optional[Dict[str, Any]] = None
+    #: Output group taken from the file where the step is *defined*, not the file that includes
+    #: it, so the step's output directory is identical whether its file is run standalone or
+    #: spliced into a larger pipeline. Assembly metadata: set during loading, never serialized.
+    home_group: Optional[str] = field(default=None, compare=False, repr=False)
+    _home_group_set: bool = field(default=False, compare=False, repr=False)
+
+    def __post_serialize__(self, d: Dict[str, Any]) -> Dict[str, Any]:
+        d = super().__post_serialize__(d)
+        d.pop("home_group", None)
+        d.pop("_home_group_set", None)
+        return d
+
+    def set_home_group(self, group_name: Optional[str]) -> None:
+        """Pin the output group to the file where this step is defined (idempotent per step)."""
+        self.home_group = group_name
+        self._home_group_set = True
+
+    def resolve_output_group(self, fallback: Optional[str]) -> Optional[str]:
+        """Group driving the step's output dir: its defining-file group, or `fallback` if not loaded from a file."""
+        return self.home_group if self._home_group_set else fallback
 
 
 PipelineConfig: TypeAlias = Union[List[PipelineStepConfig], OrderedDict[str, List[PipelineStepConfig]]]
@@ -120,6 +142,8 @@ class PipelineLoader(Generic[TPipelineStep]):
         result = []
         for step_config in steps_config:
             step_class_name = step_config.class_name or step_config.step
+            if not step_class_name:
+                raise UserNotificationException("A pipeline step must define a 'step' name. Please check your pipeline configuration.")
             if step_config.module:
                 step_class = PipelineLoader[TPipelineStep]._load_module_step(step_config.module, step_class_name)
             elif step_config.file:
@@ -131,7 +155,9 @@ class PipelineLoader(Generic[TPipelineStep]):
                     raise UserNotificationException(
                         f"Step '{step_class_name}' has no 'module' nor 'file' defined nor a custom step class factory was provided. Please check your pipeline configuration."
                     )
-            result.append(PipelineStepReference(group_name, step_class, step_config.config))
+            # The output group comes from where the step is DEFINED, not the (possibly including) file
+            # being assembled here; this keeps a step's output dir stable across standalone vs included runs.
+            result.append(PipelineStepReference(step_config.resolve_output_group(group_name), step_class, step_config.config))
         return result
 
     @staticmethod
