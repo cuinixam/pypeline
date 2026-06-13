@@ -4,33 +4,22 @@ import json
 import traceback
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Generic, Optional, TypeVar
+from typing import Any, Generic, TypeVar
 
 import yaml
 from mashumaro.config import BaseConfig
 from mashumaro.mixins.json import DataClassJSONMixin
-from py_app_dev.core.config import BaseConfigDictMixin as _BaseConfigDictMixin
+from py_app_dev.core.config import ConfigElement, ConfigFile, merge_named_elements
 from py_app_dev.core.exceptions import UserNotificationException
 from py_app_dev.core.logging import logger
-from yaml.parser import ParserError
-from yaml.scanner import ScannerError
 
-from pypeline.domain.execution_context import ExecutionContext
-from pypeline.domain.pipeline import PipelineStep
-
-
-class BaseConfigDictMixin(_BaseConfigDictMixin):
-    """Local mixin that serializes using field aliases for west.yaml compatibility."""
-
-    class Config(BaseConfig):
-        """Mashumaro configuration with alias serialization."""
-
-        omit_none = True
-        serialize_by_alias = True
+from ..domain.execution_context import ExecutionContext
+from ..domain.pipeline import PipelineStep
+from ..main import package_version_file
 
 
 @dataclass
-class WestDependency(BaseConfigDictMixin):
+class WestDependency(ConfigElement):
     #: Project name
     name: str
     #: Remote name
@@ -40,11 +29,11 @@ class WestDependency(BaseConfigDictMixin):
     #: Path where the dependency will be installed
     path: str
     #: Clone depth for shallow clones (optional, west native support)
-    clone_depth: Optional[int] = field(default=None, metadata={"alias": "clone-depth"})
+    clone_depth: int | None = field(default=None, metadata={"alias": "clone-depth"})
 
 
 @dataclass
-class WestRemote(BaseConfigDictMixin):
+class WestRemote(ConfigElement):
     #: Remote name
     name: str
     #: URL base
@@ -52,37 +41,20 @@ class WestRemote(BaseConfigDictMixin):
 
 
 @dataclass
-class WestManifest(BaseConfigDictMixin):
+class WestManifest(ConfigElement):
     #: Remote configurations
     remotes: list[WestRemote] = field(default_factory=list)
     #: Project dependencies
     projects: list[WestDependency] = field(default_factory=list)
 
 
-@dataclass
-class WestManifestFile(BaseConfigDictMixin):
-    manifest: WestManifest
-    # This field is intended to keep track of where configuration was loaded from and
-    # it is automatically added when configuration is loaded from file
-    file: Optional[Path] = None
-
+class WestManifestFile(ConfigFile[WestManifest]):
     @classmethod
-    def from_file(cls, config_file: Path) -> "WestManifestFile":
-        config_dict = cls.parse_to_dict(config_file)
-        return cls.from_dict(config_dict)
-
-    @staticmethod
-    def parse_to_dict(config_file: Path) -> dict[str, Any]:
-        try:
-            with open(config_file) as fs:
-                config_dict = yaml.safe_load(fs)
-                # Add file name to config to keep track of where configuration was loaded from
-                config_dict["file"] = config_file
-            return config_dict
-        except ScannerError as e:
-            raise UserNotificationException(f"Failed scanning west manifest file '{config_file}'. \nError: {e}") from e
-        except ParserError as e:
-            raise UserNotificationException(f"Failed parsing west manifest file '{config_file}'. \nError: {e}") from e
+    def from_dict(cls, data: dict[str, Any]) -> "WestManifestFile":
+        # The west.yaml wire format nests the payload under a top-level "manifest" key.
+        if "manifest" not in data:
+            raise UserNotificationException("West manifest is missing the 'manifest' key.")
+        return cls(payload=WestManifest.from_dict(data["manifest"]))
 
 
 @dataclass
@@ -126,16 +98,16 @@ class WestInstallConfig(DataClassJSONMixin):
     """Configuration for WestInstall step."""
 
     #: Relative path from project root for west workspace directory
-    workspace_dir: Optional[str] = None
+    workspace_dir: str | None = None
     #: Relative path from project root to west manifest file (defaults to west.yaml)
-    manifest_file: Optional[str] = None
+    manifest_file: str | None = None
 
 
 TContext = TypeVar("TContext", bound=ExecutionContext)
 
 
 class WestInstall(PipelineStep[TContext], Generic[TContext]):
-    def __init__(self, execution_context: TContext, group_name: str, config: Optional[dict[str, Any]] = None) -> None:
+    def __init__(self, execution_context: TContext, group_name: str, config: dict[str, Any] | None = None) -> None:
         super().__init__(execution_context, group_name, config)
         self.logger = logger.bind()
         self.install_result = WestInstallResult()
@@ -146,7 +118,7 @@ class WestInstall(PipelineStep[TContext], Generic[TContext]):
 
     @property
     def _manifests(self) -> list[WestManifest]:
-        return [mf.manifest for mf in self._manifest_files]
+        return [manifest_file.payload for manifest_file in self._manifest_files]
 
     def _resolve_workspace_dir(self) -> Path:
         """Resolve workspace directory from data registry (priority) or config."""
@@ -163,15 +135,10 @@ class WestInstall(PipelineStep[TContext], Generic[TContext]):
         return self.execution_context.create_artifacts_locator().build_dir
 
     def _collect_manifests(self) -> list[WestManifestFile]:
+        """Collect manifest sources in override order: a later source overrides an earlier one. Override to add additional sources."""
         manifests: list[WestManifestFile] = []
-
         if self._source_manifest_file.exists():
-            try:
-                manifests.append(WestManifestFile.from_file(self._source_manifest_file))
-            except Exception as e:
-                self.logger.warning(f"Failed to parse source west.yaml: {e}")
-
-        # Check if there are registered manifests in the execution context data registry
+            manifests.append(WestManifestFile.from_file(self._source_manifest_file))
         manifests.extend(self.execution_context.data_registry.find_data(WestManifestFile))
         return manifests
 
@@ -218,15 +185,11 @@ class WestInstall(PipelineStep[TContext], Generic[TContext]):
         return self._do_merge_manifests(self._manifests)
 
     def _do_merge_manifests(self, manifests: list[WestManifest]) -> WestManifest:
-        """Merge multiple manifests, preserving order. First occurrence wins."""
+        """Merge multiple manifests in list order; a later definition with the same name overrides the earlier one."""
         merged = WestManifest()
         for manifest in manifests:
-            for remote in manifest.remotes:
-                if remote not in merged.remotes:
-                    merged.remotes.append(remote)
-            for project in manifest.projects:
-                if project not in merged.projects:
-                    merged.projects.append(project)
+            merge_named_elements(merged.remotes, manifest.remotes)
+            merge_named_elements(merged.projects, manifest.projects)
         return merged
 
     def _write_west_manifest_file(self, manifest: WestManifest) -> None:
@@ -301,11 +264,11 @@ class WestInstall(PipelineStep[TContext], Generic[TContext]):
         self.install_result.installed_dirs = list(dict.fromkeys(dirs))
 
     def get_inputs(self) -> list[Path]:
-        inputs: list[Path] = []
-        for manifest_file in self._manifest_files:
-            if manifest_file.file and manifest_file.file.exists():
-                inputs.append(manifest_file.file)
-        return inputs
+        # The package version file re-runs the step on a pypeline upgrade: the west step's own
+        # merge/generation/orchestration is pypeline code, so a fix there must invalidate the cache.
+        inputs: list[Path] = [package_version_file()]
+        inputs.extend(manifest_file.file for manifest_file in self._manifest_files if manifest_file.file and manifest_file.file.exists())
+        return list(dict.fromkeys(inputs))
 
     def get_outputs(self) -> list[Path]:
         outputs: list[Path] = [self._output_manifest_file, self._install_result_file]

@@ -116,18 +116,45 @@ Downloads multi-repo dependencies using [west](https://docs.zephyrproject.org/la
     workspace_dir: external/deps   # custom workspace directory
 ```
 
+The step supports multiple manifest sources. Beyond the configured manifest file, it collects every `WestManifestFile` registered in the execution context data registry by previous steps, and subclasses can override `_collect_manifests()` to contribute more sources. The collection order defines the override order, like git config files: the configured manifest is the base, and a later source's remote or project with the same name overrides the earlier definition. Every collected manifest file is tracked as a step input, so editing any of them re-runs the step.
+
+Because `west.yaml` is YAML, a malformed entry (a wrong type or a missing required field) is reported with its exact `file:line:column`, so you can jump straight to the offending line instead of hunting for it. The generated manifest carries only the merged values; the source locations are dropped on the way out.
+
 ### ScoopInstall
 
 Installs Windows applications via [Scoop](https://scoop.sh/).
+
+| Config | Type | Default | Description |
+|--------|------|---------|-------------|
+| — | — | — | No configuration options |
 
 ```yaml
 - step: ScoopInstall
   module: pypeline.steps.scoop_install
 ```
 
+Dependencies are read from `scoopfile.json` in the project root. Like `WestInstall`, the step supports multiple manifest sources: it collects every `ScoopManifestFile` registered in the data registry, and subclasses can override `_collect_manifests()` to contribute more. The collection order defines the override order, like git config files: the root `scoopfile.json` is the base, and a later source's bucket or app with the same name overrides the earlier definition. Every collected manifest file is tracked as a step input.
+
 ```{warning}
 Windows only. Logs a warning and skips on other platforms.
 ```
+
+### PoksInstall
+
+Installs tools cross-platform via [poks](https://github.com/cuinixam/poks) (a scoop-like package manager that works on Windows, Linux, and macOS).
+
+| Config | Type | Default | Description |
+|--------|------|---------|-------------|
+| `install_dir` | string | `~/.poks` | Relative path from project root for the poks installation directory (`.poks` is appended) |
+
+```yaml
+- step: PoksInstall
+  module: pypeline.steps.poks_install
+  config:
+    install_dir: build/tools
+```
+
+Dependencies are read from `poks.json` in the project root. The step supports multiple config sources: it collects every `PoksManifestFile` registered in the data registry, and subclasses can override `_collect_manifests()` to contribute more. The collection order defines the override order, like git config files: the root `poks.json` is the base, and a later source's bucket or app with the same name overrides the earlier definition. Every collected config file is tracked as a step input.
 
 ### GenerateEnvSetupScript
 

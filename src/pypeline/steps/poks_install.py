@@ -1,16 +1,16 @@
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Generic, Optional, TypeVar
+from typing import Any, Generic, TypeVar
 
-from poks.domain import PoksApp, PoksBucket
 from poks.domain import PoksConfig as _PoksConfig
 from poks.poks import Poks
-from py_app_dev.core.config import BaseConfigJSONMixin
+from py_app_dev.core.config import BaseConfigJSONMixin, ConfigFile, merge_named_elements
 from py_app_dev.core.exceptions import UserNotificationException
 from py_app_dev.core.logging import logger
 
-from pypeline.domain.execution_context import ExecutionContext
-from pypeline.domain.pipeline import PipelineStep
+from ..domain.execution_context import ExecutionContext
+from ..domain.pipeline import PipelineStep
+from ..main import package_version_file
 
 
 @dataclass
@@ -28,18 +28,23 @@ class PoksInstallConfig(BaseConfigJSONMixin):
     """Configuration for PoksInstall step."""
 
     #: Relative path from project root for poks installation directory (will have .poks appended)
-    install_dir: Optional[str] = None
+    install_dir: str | None = None
+
+
+class PoksManifestFile(ConfigFile[_PoksConfig]):
+    pass
 
 
 TContext = TypeVar("TContext", bound=ExecutionContext)
 
 
 class PoksInstall(PipelineStep[TContext], Generic[TContext]):
-    def __init__(self, execution_context: TContext, group_name: str, config: Optional[dict[str, Any]] = None) -> None:
+    def __init__(self, execution_context: TContext, group_name: str, config: dict[str, Any] | None = None) -> None:
         super().__init__(execution_context, group_name, config)
         self.logger = logger.bind()
         self.execution_info = PoksInstallExecutionInfo()
         self.user_config = PoksInstallConfig.from_dict(config) if config else PoksInstallConfig()
+        self._manifest_files = self._collect_manifests()
 
     def get_name(self) -> str:
         return self.__class__.__name__
@@ -80,37 +85,25 @@ class PoksInstall(PipelineStep[TContext], Generic[TContext]):
         # Default fallback
         return Path.home() / ".poks"
 
-    def _collect_dependencies(self) -> _PoksConfig:
-        """Collect Poks dependencies. Override to add additional sources."""
-        collected = _PoksConfig()
+    def _collect_manifests(self) -> list[PoksManifestFile]:
+        """
+        Collect config sources in override order: a later source overrides an earlier one. Override to add additional sources.
 
+        Called during __init__; overrides must not rely on subclass state initialized after super().__init__().
+        """
+        manifests: list[PoksManifestFile] = []
         if self._source_config_file.exists():
-            try:
-                source_config = _PoksConfig.from_file(self._source_config_file)
-                self._merge_buckets(collected, source_config.buckets)
-                self._merge_apps(collected, source_config.apps)
-            except Exception as e:
-                self.logger.warning(f"Failed to parse source poks.json: {e}")
+            manifests.append(PoksManifestFile.from_file(self._source_config_file))
+        manifests.extend(self.execution_context.data_registry.find_data(PoksManifestFile))
+        return manifests
 
-        return collected
-
-    def _merge_buckets(self, target: _PoksConfig, source_buckets: list[PoksBucket]) -> None:
-        """Merge buckets, handling conflicts when same name has different URLs."""
-        for bucket in source_buckets:
-            existing = next((b for b in target.buckets if b.name == bucket.name), None)
-
-            if existing is None:
-                target.buckets.append(bucket)
-            elif existing.url != bucket.url:
-                self.logger.warning(
-                    f"Bucket '{bucket.name}' defined multiple times with different URLs:\n  Existing: {existing.url}\n  New: {bucket.url}\n  Keeping existing definition."
-                )
-
-    def _merge_apps(self, target: _PoksConfig, source_apps: list[PoksApp]) -> None:
-        """Merge apps, avoiding duplicates."""
-        for app in source_apps:
-            if app not in target.apps:
-                target.apps.append(app)
+    def _merge_manifests(self) -> _PoksConfig:
+        """Merge the collected configs in list order; a later definition with the same name overrides the earlier one."""
+        merged = _PoksConfig()
+        for manifest_file in self._manifest_files:
+            merge_named_elements(merged.buckets, manifest_file.payload.buckets)
+            merge_named_elements(merged.apps, manifest_file.payload.apps)
+        return merged
 
     def _generate_poks_config(self, config: _PoksConfig) -> None:
         """Generate poks.json file from collected dependencies."""
@@ -127,7 +120,7 @@ class PoksInstall(PipelineStep[TContext], Generic[TContext]):
         self.logger.debug(f"Run {self.get_name()} step. Output dir: {self.output_dir}")
 
         try:
-            collected = self._collect_dependencies()
+            collected = self._merge_manifests()
 
             self._generate_poks_config(collected)
 
@@ -153,10 +146,10 @@ class PoksInstall(PipelineStep[TContext], Generic[TContext]):
         return 0
 
     def get_inputs(self) -> list[Path]:
-        inputs: list[Path] = []
-        if self._source_config_file.exists():
-            inputs.append(self._source_config_file)
-        return inputs
+        # The package version file makes the step re-run on a pypeline upgrade (the install logic ships with the poks package).
+        inputs: list[Path] = [package_version_file()]
+        inputs.extend(manifest_file.file for manifest_file in self._manifest_files if manifest_file.file and manifest_file.file.exists())
+        return list(dict.fromkeys(inputs))
 
     def get_outputs(self) -> list[Path]:
         outputs: list[Path] = [self._output_config_file, self._execution_info_file]

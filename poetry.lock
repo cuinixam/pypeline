@@ -1430,20 +1430,21 @@ test = ["psleak", "pytest", "pytest-instafail", "pytest-xdist", "pywin32 ; os_na
 
 [[package]]
 name = "py-app-dev"
-version = "2.21.0"
+version = "2.22.0"
 description = "My application development modules."
 optional = false
 python-versions = "<4.0,>=3.10"
 groups = ["main"]
 files = [
-    {file = "py_app_dev-2.21.0-py3-none-any.whl", hash = "sha256:581d33974b6029b32a6597be5ea43a2315a9071d15e44298f244ebc8f0495ee6"},
-    {file = "py_app_dev-2.21.0.tar.gz", hash = "sha256:c78fd4afd0fb381783a19af7bad1213c9afcc6b8f85fb9b50aae17d8e255e4c6"},
+    {file = "py_app_dev-2.22.0-py3-none-any.whl", hash = "sha256:cfca68a270f119110060d9ad2095296db8697c87c88ada729e2cfadf369db432"},
+    {file = "py_app_dev-2.22.0.tar.gz", hash = "sha256:1664b641d0690ebc8ad90033f8c8c123b9eb88a33429fa331b0f4e76329b8ae5"},
 ]
 
 [package.dependencies]
 loguru = ">=0.7,<1.0"
 mashumaro = ">=3.5,<4.0"
 psutil = ">=7.1,<8.0"
+pyyaml = ">=6.0,<7.0"
 
 [[package]]
 name = "py7zr"
@@ -2752,4 +2753,4 @@ cffi = ["cffi (>=1.17,<2.0) ; platform_python_implementation != \"PyPy\" and pyt
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "3c8a4c7541cdf966afec754896670660d7b54049bbf494cd5e5bac3638124df6"
+content-hash = "e925dbfeb94bcc29d47b9da2edd2af2954dd04f236421bb0987abcccbec4bcba"

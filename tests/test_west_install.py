@@ -3,11 +3,13 @@ from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
+import yaml
 from py_app_dev.core.data_registry import DataRegistry
 from py_app_dev.core.exceptions import UserNotificationException
 
 from pypeline.domain.artifacts import ProjectArtifactsLocator
 from pypeline.domain.execution_context import ExecutionContext
+from pypeline.main import package_version_file
 from pypeline.steps.west_install import (
     WestDependency,
     WestInstall,
@@ -138,10 +140,10 @@ manifest:
     west_manifest = WestManifestFile.from_file(manifest_file)
 
     assert west_manifest.file == manifest_file
-    remote = assert_element_of_type(west_manifest.manifest.remotes, WestRemote)
+    remote = assert_element_of_type(west_manifest.payload.remotes, WestRemote)
     assert remote.name == "origin"
     assert remote.url_base == "https://github.com/org"
-    dep = assert_element_of_type(west_manifest.manifest.projects, WestDependency)
+    dep = assert_element_of_type(west_manifest.payload.projects, WestDependency)
     assert dep.name == "zephyr"
     assert dep.remote == "origin"
     assert dep.revision == "v3.2.0"
@@ -152,7 +154,7 @@ def test_west_manifest_file_parse_error(tmp_path: Path) -> None:
     manifest_file = tmp_path / "west.yaml"
     manifest_file.write_text("invalid: yaml: content: [")
 
-    with pytest.raises(UserNotificationException, match="Failed scanning west manifest file"):
+    with pytest.raises(UserNotificationException, match="Failed parsing configuration file"):
         WestManifestFile.from_file(manifest_file)
 
 
@@ -179,8 +181,8 @@ manifest:
 
     west_manifest = WestManifestFile.from_file(manifest_file)
 
-    assert len(west_manifest.manifest.remotes) == 2
-    assert len(west_manifest.manifest.projects) == 2
+    assert len(west_manifest.payload.remotes) == 2
+    assert len(west_manifest.payload.projects) == 2
 
 
 def test_west_manifest_file_with_clone_depth(tmp_path: Path) -> None:
@@ -201,8 +203,22 @@ manifest:
 
     west_manifest = WestManifestFile.from_file(manifest_file)
 
-    dep = assert_element_of_type(west_manifest.manifest.projects, WestDependency)
+    dep = assert_element_of_type(west_manifest.payload.projects, WestDependency)
     assert dep.clone_depth == 1
+
+
+def test_west_install_reports_file_line_and_column_for_a_malformed_manifest(tmp_path: Path) -> None:
+    manifest_file = tmp_path / "west.yaml"
+    manifest_file.write_text(
+        "manifest:\n"
+        "  projects:\n"
+        "    - name: zephyr\n"
+        "      remote: origin\n"
+        "      revision: v3.2.0\n"  # the required 'path' field is missing
+    )
+
+    with pytest.raises(UserNotificationException, match=rf"{manifest_file.name}:\d+:\d+"):
+        WestManifestFile.from_file(manifest_file)
 
 
 # ============================================================================
@@ -347,9 +363,8 @@ def test_west_install_merge_manifests(west_execution_context: Mock) -> None:
     """
     Test that manifests are merged correctly.
 
-    Note: Duplicates are detected by full object equality (all fields),
-    not just by name. This means entries with same name but different
-    values are treated as distinct.
+    Entries are matched by name: a later manifest's entry with the same
+    name overrides the earlier one (git-config style precedence).
     """
     step = WestInstall(west_execution_context, "group_name")
 
@@ -358,9 +373,8 @@ def test_west_install_merge_manifests(west_execution_context: Mock) -> None:
     remote2 = WestRemote(name="origin", url_base="https://github.com/org")  # true duplicate
     remote3 = WestRemote(name="secondary", url_base="https://github.com/sec")
 
-    # Identical deps (same all fields) - should dedupe
     dep1 = WestDependency(name="dep1", remote="origin", revision="v1.0", path="deps/dep1")
-    dep2 = WestDependency(name="dep1", remote="origin", revision="v1.0", path="deps/dep1")  # true duplicate
+    dep2 = WestDependency(name="dep1", remote="origin", revision="v2.0", path="deps/dep1")  # same name, newer revision
     dep3 = WestDependency(name="dep2", remote="secondary", revision="v1.0", path="deps/dep2")
 
     manifest1 = WestManifest(remotes=[remote1], projects=[dep1])
@@ -374,10 +388,10 @@ def test_west_install_merge_manifests(west_execution_context: Mock) -> None:
     assert merged.remotes[0].url_base == "https://github.com/org"
     assert merged.remotes[1].name == "secondary"
 
-    # True duplicates (identical objects) are removed
+    # Same name resolves to a single entry; the later manifest's definition wins
     assert len(merged.projects) == 2
     assert merged.projects[0].name == "dep1"
-    assert merged.projects[0].revision == "v1.0"
+    assert merged.projects[0].revision == "v2.0"
     assert merged.projects[1].name == "dep2"
 
 
@@ -393,14 +407,61 @@ def test_west_install_write_manifest_generates_yaml(west_execution_context: Mock
     output_file = step._output_manifest_file
     assert output_file.exists()
 
-    import yaml
-
     parsed = yaml.safe_load(output_file.read_text())
     assert "manifest" in parsed
     assert len(parsed["manifest"]["remotes"]) == 1
     assert len(parsed["manifest"]["projects"]) == 1
     # Check url-base is converted back (not url_base)
     assert parsed["manifest"]["remotes"][0]["url-base"] == "https://github.com/org"
+
+
+def test_west_install_merges_multiple_manifests_and_strips_provenance_when_stored(west_execution_context: Mock, tmp_path: Path) -> None:
+    root_manifest = west_execution_context.project_root_dir / "west.yaml"
+    root_manifest.write_text(
+        "manifest:\n"
+        "  remotes:\n"
+        "    - name: origin\n"
+        "      url-base: https://github.com/org\n"
+        "  projects:\n"
+        "    - name: zephyr\n"
+        "      remote: origin\n"
+        "      revision: v3.2.0\n"
+        "      path: modules/zephyr\n"
+    )
+    # A second manifest file contributed by an earlier step pins zephyr higher and adds a project.
+    overlay = tmp_path / "overlay" / "west.yaml"
+    overlay.parent.mkdir()
+    overlay.write_text(
+        "manifest:\n"
+        "  projects:\n"
+        "    - name: zephyr\n"
+        "      remote: origin\n"
+        "      revision: v3.5.0\n"
+        "      path: modules/zephyr\n"
+        "    - name: hal\n"
+        "      remote: origin\n"
+        "      revision: v1.0.0\n"
+        "      path: modules/hal\n"
+    )
+    west_execution_context.data_registry.insert(WestManifestFile.from_file(overlay), provider="EarlierStep")
+
+    step = WestInstall(west_execution_context, "deps")
+    merged = step._merge_manifests()
+
+    # The later source wins by name (v3.5.0 over v3.2.0); the extra project is added.
+    merged_revisions = {project.name: project.revision for project in merged.projects}
+    assert merged_revisions == {"zephyr": "v3.5.0", "hal": "v1.0.0"}
+    # The surviving element still knows which file it came from.
+    winning_zephyr = next(project for project in merged.projects if project.name == "zephyr")
+    assert winning_zephyr.location is not None and winning_zephyr.location.file == overlay
+
+    step._write_west_manifest_file(merged)
+
+    stored = step._output_manifest_file.read_text()
+    # Provenance is parse-time metadata: it guides merging and caching but never reaches the generated file.
+    assert "_source_location" not in stored
+    stored_revisions = {project["name"]: project["revision"] for project in yaml.safe_load(stored)["manifest"]["projects"]}
+    assert stored_revisions == {"zephyr": "v3.5.0", "hal": "v1.0.0"}
 
 
 def test_west_install_write_manifest_with_clone_depth(west_execution_context: Mock) -> None:
@@ -411,8 +472,6 @@ def test_west_install_write_manifest_with_clone_depth(west_execution_context: Mo
     manifest = WestManifest(remotes=[remote], projects=[dep])
 
     step._write_west_manifest_file(manifest)
-
-    import yaml
 
     parsed = yaml.safe_load(step._output_manifest_file.read_text())
     project = parsed["manifest"]["projects"][0]
@@ -497,6 +556,8 @@ def test_west_install_get_inputs_includes_source_manifest(west_execution_context
     inputs = step.get_inputs()
 
     assert manifest_file in inputs
+    # The package version file re-runs the step when pypeline (and its west step logic) is upgraded.
+    assert package_version_file() in inputs
 
 
 def test_west_install_get_outputs(west_execution_context: Mock) -> None:
@@ -534,7 +595,7 @@ def test_west_install_update_execution_context_no_file(west_execution_context: M
 def test_west_install_with_data_registry_manifest(west_execution_context: Mock) -> None:
     # Register a WestManifestFile in the data registry
     registered_manifest = WestManifestFile(
-        manifest=WestManifest(
+        payload=WestManifest(
             remotes=[WestRemote(name="registry", url_base="https://registry.com")],
             projects=[WestDependency(name="reg-dep", remote="registry", revision="v1.0", path="deps/reg-dep")],
         )
@@ -565,7 +626,7 @@ manifest:
 
     # Register a WestManifestFile
     registered_manifest = WestManifestFile(
-        manifest=WestManifest(
+        payload=WestManifest(
             remotes=[WestRemote(name="registry", url_base="https://registry.com")],
             projects=[WestDependency(name="reg-dep", remote="registry", revision="v1.0", path="deps/reg-dep")],
         )
@@ -727,7 +788,7 @@ def test_west_manifest_file_handles_malformed_yaml(tmp_path: Path) -> None:
     # This has a colon inside an unquoted string which causes a parser error
     manifest_file.write_text("manifest:\n  key: value: error")
 
-    with pytest.raises(UserNotificationException, match=r"Failed (scanning|parsing) west manifest file"):
+    with pytest.raises(UserNotificationException, match="Failed parsing configuration file"):
         WestManifestFile.from_file(manifest_file)
 
 

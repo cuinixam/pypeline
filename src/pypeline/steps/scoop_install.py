@@ -1,10 +1,9 @@
-import json
 import platform
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Generic, TypeVar
 
-from py_app_dev.core.config import BaseConfigJSONMixin
+from py_app_dev.core.config import BaseConfigJSONMixin, ConfigFile, merge_named_elements
 from py_app_dev.core.exceptions import UserNotificationException
 from py_app_dev.core.logging import logger
 from py_app_dev.core.scoop_wrapper import ScoopFileElement, ScoopWrapper
@@ -20,24 +19,10 @@ class ScoopManifest(BaseConfigJSONMixin):
     buckets: list[ScoopFileElement] = field(default_factory=list)
     #: Scoop applications
     apps: list[ScoopFileElement] = field(default_factory=list)
-    # This field is intended to keep track of where configuration was loaded from and
-    # it is automatically added when configuration is loaded from file
-    file: Path | None = None
 
-    @classmethod
-    def from_file(cls, config_file: Path) -> "ScoopManifest":
-        config_dict = cls.parse_to_dict(config_file)
-        return cls.from_dict(config_dict)
 
-    @staticmethod
-    def parse_to_dict(config_file: Path) -> dict[str, Any]:
-        try:
-            with open(config_file) as fs:
-                config_dict = json.loads(fs.read())
-                config_dict["file"] = config_file
-            return config_dict
-        except json.JSONDecodeError as e:
-            raise UserNotificationException(f"Failed parsing scoop manifest file '{config_file}'. \nError: {e}") from e
+class ScoopManifestFile(ConfigFile[ScoopManifest]):
+    pass
 
 
 @dataclass
@@ -66,6 +51,7 @@ class ScoopInstall(PipelineStep[TContext], Generic[TContext]):
         super().__init__(execution_context, group_name, config)
         self.logger = logger.bind()
         self.execution_info = ScoopInstallExecutionInfo()
+        self._manifest_files = self._collect_manifests()
 
     def get_name(self) -> str:
         return self.__class__.__name__
@@ -89,46 +75,25 @@ class ScoopInstall(PipelineStep[TContext], Generic[TContext]):
         """Source scoopfile.json. Override to customize."""
         return self.project_root_dir / "scoopfile.json"
 
-    def _collect_dependencies(self) -> ScoopManifest:
-        """Collect Scoop dependencies. Override to add additional sources."""
-        collected_manifest = ScoopManifest()
+    def _collect_manifests(self) -> list[ScoopManifestFile]:
+        """
+        Collect manifest sources in override order: a later source overrides an earlier one. Override to add additional sources.
 
+        Called during __init__; overrides must not rely on subclass state initialized after super().__init__().
+        """
+        manifests: list[ScoopManifestFile] = []
         if self._source_manifest_file.exists():
-            source_manifest = ScoopManifest.from_file(self._source_manifest_file)
-            self._merge_buckets(collected_manifest, source_manifest.buckets)
-            self._merge_apps(collected_manifest, source_manifest.apps)
+            manifests.append(ScoopManifestFile.from_file(self._source_manifest_file))
+        manifests.extend(self.execution_context.data_registry.find_data(ScoopManifestFile))
+        return manifests
 
-        return collected_manifest
-
-    def _merge_buckets(self, target_manifest: ScoopManifest, source_buckets: list[ScoopFileElement]) -> None:
-        """Merge buckets, handling conflicts when same name has different sources."""
-        for bucket in source_buckets:
-            existing_bucket = next((b for b in target_manifest.buckets if b.name == bucket.name), None)
-
-            if existing_bucket is None:
-                target_manifest.buckets.append(bucket)
-            elif existing_bucket.source != bucket.source:
-                self.logger.warning(
-                    f"Bucket '{bucket.name}' defined multiple times with different sources:\n"
-                    f"  Existing: {existing_bucket.source}\n"
-                    f"  New: {bucket.source}\n"
-                    f"  Keeping existing definition."
-                )
-
-    def _merge_apps(self, target_manifest: ScoopManifest, source_apps: list[ScoopFileElement]) -> None:
-        """Merge apps, warning when the same app is declared with a different source or version."""
-        for app in source_apps:
-            existing_app = next((a for a in target_manifest.apps if a.name == app.name), None)
-
-            if existing_app is None:
-                target_manifest.apps.append(app)
-            elif existing_app != app:
-                self.logger.warning(
-                    f"App '{app.name}' defined multiple times with different definitions:\n"
-                    f"  Existing: source={existing_app.source}, version={existing_app.version}\n"
-                    f"  New: source={app.source}, version={app.version}\n"
-                    f"  Keeping existing definition."
-                )
+    def _merge_manifests(self) -> ScoopManifest:
+        """Merge the collected manifests in list order; a later definition with the same name overrides the earlier one."""
+        merged = ScoopManifest()
+        for manifest_file in self._manifest_files:
+            merge_named_elements(merged.buckets, manifest_file.payload.buckets)
+            merge_named_elements(merged.apps, manifest_file.payload.apps)
+        return merged
 
     def _generate_scoop_manifest(self, manifest: ScoopManifest) -> None:
         """Generate scoopfile.json file from collected dependencies."""
@@ -148,7 +113,7 @@ class ScoopInstall(PipelineStep[TContext], Generic[TContext]):
             self.logger.warning(f"ScoopInstall step is only supported on Windows. Skipping. Current platform: {platform.system()}")
             return 0
 
-        collected_manifest = self._collect_dependencies()
+        collected_manifest = self._merge_manifests()
         self._generate_scoop_manifest(collected_manifest)
 
         if not collected_manifest.apps:
@@ -174,10 +139,10 @@ class ScoopInstall(PipelineStep[TContext], Generic[TContext]):
         return 0
 
     def get_inputs(self) -> list[Path]:
+        # The package version file makes the step re-run on a pypeline upgrade (the install logic ships with pypeline).
         inputs: list[Path] = [package_version_file()]
-        if self._source_manifest_file.exists():
-            inputs.append(self._source_manifest_file)
-        return inputs
+        inputs.extend(manifest_file.file for manifest_file in self._manifest_files if manifest_file.file and manifest_file.file.exists())
+        return list(dict.fromkeys(inputs))
 
     def get_outputs(self) -> list[Path]:
         outputs: list[Path] = [self._output_manifest_file, self._execution_info_file]
