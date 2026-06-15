@@ -137,9 +137,13 @@ Tests use `conftest.py` fixtures for consistent setup:
 ### Environment Setup
 
 ```bash
-pipx install pypeline-runner  # Install pypeline globally
-pypeline run                   # Creates .venv and installs dependencies
+pipx install pypeline-runner        # Install pypeline globally
+pypeline run --step CreateVEnv      # Creates .venv and installs project in dev mode
+pypeline run                        # Run full pipeline (tests, linting, etc.)
 ```
+
+> [!IMPORTANT]
+> **When developing new built-in steps**: If you add a new step module under `src/pypeline/steps/` and reference it via `module:` in `pypeline.yaml`, you must first run `pypeline run --step CreateVEnv` to create/update the virtual environment. This installs the project in development mode so the new module becomes importable. Running `pypeline run` directly will fail because it tries to load all step modules before executing any step, and new modules won't be found in the globally installed package.
 
 ### Running Tasks
 

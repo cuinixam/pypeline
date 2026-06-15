@@ -4,6 +4,10 @@ pipeline:
     config:
       package_manager: poetry==2.2.1
       python_version: 3.11
+  - step: ResolveLicenseServer
+    module: pypeline.steps.resolve_license
+    config:
+      license_config: license_servers.json
   - step: GenerateEnvSetupScript
     module: pypeline.steps.env_setup_script
   - step: PreCommit
