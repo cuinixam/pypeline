@@ -7,4 +7,5 @@ Conceptual guides to understand how pypeline works.
 
 architecture
 execution_model
+decisions/index
 ```

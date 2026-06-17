@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from typing import Any
 from unittest.mock import Mock
 
 import pytest
@@ -9,6 +10,7 @@ from py_app_dev.core.exceptions import UserNotificationException
 
 from pypeline.domain.artifacts import ProjectArtifactsLocator
 from pypeline.domain.execution_context import ExecutionContext
+from pypeline.domain.external_project import ExternalProject
 from pypeline.main import package_version_file
 from pypeline.steps.west_install import (
     WestDependency,
@@ -919,6 +921,103 @@ def test_west_install_get_config_only_manifest_file(west_execution_context: Mock
     assert result is not None
     assert result["manifest_file"] == "deps/west.yaml"
     assert "workspace_dir" not in result
+
+
+# ============================================================================
+# revision_scoped_paths Tests
+# ============================================================================
+
+
+@pytest.mark.parametrize("config, expected", [(None, False), ({"revision_scoped_paths": True}, True), ({"revision_scoped_paths": False}, False)])
+def test_west_install_config_revision_scoped_paths(config: dict[str, Any] | None, expected: bool) -> None:
+    parsed = WestInstallConfig.from_dict(config) if config else WestInstallConfig()
+    assert parsed.revision_scoped_paths is expected
+
+
+@pytest.mark.parametrize(
+    "config, revision, expected_path",
+    [
+        (None, "v3.2.0", "external/zephyr"),
+        ({"revision_scoped_paths": True}, "v3.2.0", "external/zephyr/v3.2.0"),
+        ({"revision_scoped_paths": True}, "release/new", "external/zephyr/release_new"),
+    ],
+)
+def test_west_install_merge_applies_revision_scoped_paths(west_execution_context: Mock, config: dict[str, Any] | None, revision: str, expected_path: str) -> None:
+    manifest_file = west_execution_context.project_root_dir / "west.yaml"
+    manifest_file.write_text(f"manifest:\n  projects:\n    - name: zephyr\n      remote: origin\n      revision: {revision}\n      path: external/zephyr\n")
+
+    step = WestInstall(west_execution_context, "deps", config)
+
+    assert step._merge_manifests().projects[0].path == expected_path
+
+
+def test_west_install_revision_scoped_path_reaches_generated_manifest(west_execution_context: Mock) -> None:
+    manifest_file = west_execution_context.project_root_dir / "west.yaml"
+    manifest_file.write_text("manifest:\n  projects:\n    - name: zephyr\n      remote: origin\n      revision: v3.2.0\n      path: external/zephyr\n")
+    west_execution_context.create_process_executor.return_value = Mock()
+
+    step = WestInstall(west_execution_context, "deps", {"revision_scoped_paths": True})
+    step.run()
+
+    stored = yaml.safe_load(step._output_manifest_file.read_text())
+    assert stored["manifest"]["projects"][0]["path"] == "external/zephyr/v3.2.0"
+
+
+@pytest.mark.parametrize("scoped, expected", [(True, {"revision_scoped_paths": "True"}), (False, None)])
+def test_west_install_get_config_revision_scoped_paths(west_execution_context: Mock, scoped: bool, expected: dict[str, str] | None) -> None:
+    step = WestInstall(west_execution_context, "group_name", {"revision_scoped_paths": scoped})
+    assert step.get_config() == expected
+
+
+# ============================================================================
+# ExternalProject registry publication (consumers locate deps by name)
+# ============================================================================
+
+
+def _write_single_dep_manifest(project_root: Path, revision: str = "v3.2.0") -> None:
+    (project_root / "west.yaml").write_text(f"manifest:\n  projects:\n    - name: zephyr\n      remote: origin\n      revision: {revision}\n      path: external/zephyr\n")
+
+
+def test_west_install_publishes_external_project_to_registry(west_execution_context: Mock) -> None:
+    _write_single_dep_manifest(west_execution_context.project_root_dir)
+    west_execution_context.create_process_executor.return_value = Mock()
+    step = WestInstall(west_execution_context, "deps")
+    (step._west_workspace_dir / "external/zephyr").mkdir(parents=True)  # simulate the clone west would create
+
+    step.run()
+    step.update_execution_context()
+
+    assert west_execution_context.data_registry.find_data(ExternalProject) == [
+        ExternalProject(name="zephyr", revision="v3.2.0", path=step._west_workspace_dir / "external/zephyr")
+    ]
+
+
+def test_west_install_publishes_revision_scoped_path_so_consumers_find_it(west_execution_context: Mock) -> None:
+    _write_single_dep_manifest(west_execution_context.project_root_dir)
+    west_execution_context.create_process_executor.return_value = Mock()
+    step = WestInstall(west_execution_context, "deps", {"revision_scoped_paths": True})
+    (step._west_workspace_dir / "external/zephyr/v3.2.0").mkdir(parents=True)  # simulate the scoped clone
+
+    step.run()
+    step.update_execution_context()
+
+    published = west_execution_context.data_registry.find_data(ExternalProject)[0]
+    assert published.name == "zephyr"
+    assert published.path == step._west_workspace_dir / "external/zephyr/v3.2.0"
+
+
+def test_west_install_publishes_external_project_on_cache_hit(west_execution_context: Mock) -> None:
+    _write_single_dep_manifest(west_execution_context.project_root_dir)
+    west_execution_context.create_process_executor.return_value = Mock()
+    step = WestInstall(west_execution_context, "deps")
+    (step._west_workspace_dir / "external/zephyr").mkdir(parents=True)
+    step.run()  # produces the persisted install result on disk
+
+    west_execution_context.data_registry = DataRegistry()
+    cached_step = WestInstall(west_execution_context, "deps")  # a later invocation that skips run()
+    cached_step.update_execution_context()
+
+    assert [p.name for p in west_execution_context.data_registry.find_data(ExternalProject)] == ["zephyr"]
 
 
 # ============================================================================

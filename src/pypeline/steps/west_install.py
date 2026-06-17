@@ -1,6 +1,7 @@
 import hashlib
 import io
 import json
+import re
 import traceback
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -14,6 +15,7 @@ from py_app_dev.core.exceptions import UserNotificationException
 from py_app_dev.core.logging import logger
 
 from ..domain.execution_context import ExecutionContext
+from ..domain.external_project import ExternalProject
 from ..domain.pipeline import PipelineStep
 from ..main import package_version_file
 
@@ -59,9 +61,12 @@ class WestManifestFile(ConfigFile[WestManifest]):
 
 @dataclass
 class WestInstallResult(DataClassJSONMixin):
-    """Tracks paths of installed west dependencies."""
+    """Tracks the outcome of a west install: the directories created and the projects installed."""
 
     installed_dirs: list[Path] = field(default_factory=list)
+    #: One entry per installed project, persisted so consumers can be told where each
+    #: dependency landed even when the step is skipped on a cache hit.
+    installed_projects: list[ExternalProject] = field(default_factory=list)
 
     class Config(BaseConfig):
         """Mashumaro configuration for JSON serialization."""
@@ -101,6 +106,10 @@ class WestInstallConfig(DataClassJSONMixin):
     workspace_dir: str | None = None
     #: Relative path from project root to west manifest file (defaults to west.yaml)
     manifest_file: str | None = None
+    #: Append each dependency's revision to its install path so the same dependency
+    #: pinned at different revisions installs into separate directories instead of
+    #: sharing (and re-checking-out) one path.
+    revision_scoped_paths: bool = False
 
 
 TContext = TypeVar("TContext", bound=ExecutionContext)
@@ -179,10 +188,24 @@ class WestInstall(PipelineStep[TContext], Generic[TContext]):
             config["workspace_dir"] = self.user_config.workspace_dir
         if self.user_config.manifest_file:
             config["manifest_file"] = self.user_config.manifest_file
+        if self.user_config.revision_scoped_paths:
+            config["revision_scoped_paths"] = str(self.user_config.revision_scoped_paths)
         return config if config else None
 
     def _merge_manifests(self) -> WestManifest:
-        return self._do_merge_manifests(self._manifests)
+        merged = self._do_merge_manifests(self._manifests)
+        if self.user_config.revision_scoped_paths:
+            self._append_revision_to_paths(merged)
+        return merged
+
+    def _append_revision_to_paths(self, manifest: WestManifest) -> None:
+        """Nest each dependency under a revision subdirectory so the same dependency pinned at different revisions no longer shares (and re-checks-out) one directory."""
+        for project in manifest.projects:
+            project.path = f"{project.path}/{self._sanitize_revision(project.revision)}"
+
+    @staticmethod
+    def _sanitize_revision(revision: str) -> str:
+        return re.sub(r"[\\/\s]", "_", revision)
 
     def _do_merge_manifests(self, manifests: list[WestManifest]) -> WestManifest:
         """Merge multiple manifests in list order; a later definition with the same name overrides the earlier one."""
@@ -240,7 +263,7 @@ class WestInstall(PipelineStep[TContext], Generic[TContext]):
 
             self._run_west_init()
             self._run_west_update()
-            self._record_installed_directories(merged_manifest)
+            self._record_install_result(merged_manifest)
             self.install_result.to_json_file(self._install_result_file)
 
         except Exception as e:
@@ -248,9 +271,10 @@ class WestInstall(PipelineStep[TContext], Generic[TContext]):
 
         return 0
 
-    def _record_installed_directories(self, manifest: WestManifest) -> None:
-        """Record directories created by west."""
+    def _record_install_result(self, manifest: WestManifest) -> None:
+        """Record the directories west created and the projects it installed (name, revision, resolved path)."""
         dirs: list[Path] = []
+        projects: list[ExternalProject] = []
 
         if self._west_workspace_dir.exists():
             dirs.append(self._west_workspace_dir)
@@ -259,9 +283,11 @@ class WestInstall(PipelineStep[TContext], Generic[TContext]):
             dep_dir = self._west_workspace_dir / project.path
             if dep_dir.exists():
                 dirs.append(dep_dir)
+                projects.append(ExternalProject(name=project.name, revision=project.revision, path=dep_dir))
                 self.logger.debug(f"Tracked dependency directory: {dep_dir}")
 
         self.install_result.installed_dirs = list(dict.fromkeys(dirs))
+        self.install_result.installed_projects = projects
 
     def get_inputs(self) -> list[Path]:
         # The package version file re-runs the step on a pypeline upgrade: the west step's own
@@ -279,8 +305,10 @@ class WestInstall(PipelineStep[TContext], Generic[TContext]):
         return outputs
 
     def update_execution_context(self) -> None:
-        if self._install_result_file.exists():
-            result = WestInstallResult.from_json_file(self._install_result_file)
-            if result.installed_dirs:
-                unique_paths = list(dict.fromkeys(result.installed_dirs))
-                self.execution_context.add_install_dirs(unique_paths)
+        if not self._install_result_file.exists():
+            return
+        result = WestInstallResult.from_json_file(self._install_result_file)
+        if result.installed_dirs:
+            self.execution_context.add_install_dirs(list(dict.fromkeys(result.installed_dirs)))
+        for project in result.installed_projects:
+            self.execution_context.data_registry.insert(project, provider=self.get_name())

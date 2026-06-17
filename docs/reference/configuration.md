@@ -150,6 +150,7 @@ Downloads multi-repo dependencies using [west](https://docs.zephyrproject.org/la
 |--------|------|---------|-------------|
 | `manifest_file` | string | `west.yaml` | Relative path to west manifest file |
 | `workspace_dir` | string | `build/` | Relative path for west workspace directory |
+| `revision_scoped_paths` | bool | `false` | Nest each dependency under a revision subdirectory |
 
 ```yaml
 - step: WestInstall
@@ -157,9 +158,23 @@ Downloads multi-repo dependencies using [west](https://docs.zephyrproject.org/la
   config:
     manifest_file: deps/west.yaml  # custom manifest location
     workspace_dir: external/deps   # custom workspace directory
+    revision_scoped_paths: true          # external/zephyr/v3.2.0 instead of external/zephyr
 ```
 
+A project can select different west manifests for different configurations, and two configurations may pin the same dependency at different revisions. Because the install workspace is shared, that dependency otherwise resolves to one install path and west re-checks-out that directory each time a configuration with a different pin is built. Setting `revision_scoped_paths: true` appends each dependency's revision to its `path` (`external/zephyr` at `v3.2.0` becomes `external/zephyr/v3.2.0`), so the revisions live side by side. The flag defaults to `false` to keep the flat layout; toggling it re-runs the step.
+
 The step supports multiple manifest sources. Beyond the configured manifest file, it collects every `WestManifestFile` registered in the execution context data registry by previous steps, and subclasses can override `_collect_manifests()` to contribute more sources. The collection order defines the override order, like git config files: the configured manifest is the base, and a later source's remote or project with the same name overrides the earlier definition. Every collected manifest file is tracked as a step input, so editing any of them re-runs the step.
+
+After installing, the step publishes one `ExternalProject` (`pypeline.domain.external_project`) per project to the data registry, each carrying the project `name`, its `revision`, and the resolved absolute install `path`. A later step finds a dependency by name instead of hardcoding where it lives:
+
+```python
+from pypeline.domain.external_project import ExternalProject
+
+zephyr = next(p for p in self.execution_context.data_registry.find_data(ExternalProject) if p.name == "zephyr")
+configure_cmd = ["cmake", f"-DZEPHYR_BASE={zephyr.path}"]
+```
+
+This is what makes `revision_scoped_paths` safe to turn on: the install layout is an internal detail, and consumers always get the actual location. The projects are published whether west ran or was skipped on a cache hit.
 
 Because `west.yaml` is YAML, a malformed entry (a wrong type or a missing required field) is reported with its exact `file:line:column`, so you can jump straight to the offending line instead of hunting for it. The generated manifest carries only the merged values; the source locations are dropped on the way out.
 
