@@ -8,5 +8,4 @@ Practical recipes for solving specific problems.
 integrate_github_actions
 integrate_jenkins
 use_as_library
-configure_inputs
 ```
