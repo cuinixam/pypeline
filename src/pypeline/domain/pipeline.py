@@ -27,11 +27,22 @@ from .execution_context import ExecutionContext
 
 
 @dataclass
+class IncludeSpec(ConfigElement):
+    """Object form of ``include``: pull in only ``steps`` from ``file`` (all steps when ``steps`` is omitted)."""
+
+    #: Path to another pypeline file whose steps are spliced in
+    file: str
+    #: Names of the steps to splice in; when omitted, every step of the file is included
+    steps: Optional[List[str]] = None
+
+
+@dataclass
 class PipelineStepConfig(ConfigElement):
     #: Step name or class name if file is not specified
     step: Optional[str] = None
-    #: Path to another pypeline file whose steps are spliced in at this position (instead of a step)
-    include: Optional[str] = None
+    #: Another pypeline file whose steps are spliced in at this position (instead of a step). A plain
+    #: string includes the whole file; an :class:`IncludeSpec` includes only its named steps.
+    include: Optional[Union[str, IncludeSpec]] = None
     #: Path to file with step class
     file: Optional[str] = None
     #: Python module with step class

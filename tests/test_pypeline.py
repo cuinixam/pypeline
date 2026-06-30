@@ -616,6 +616,57 @@ def test_grouped_fragment_is_rejected(tmp_path: Path) -> None:
         ProjectConfig.from_file(main)
 
 
+def test_include_with_steps_filter_splices_only_named_steps_in_fragment_order(tmp_path: Path) -> None:
+    fragment = tmp_path / "bootstrap.pypeline.yaml"
+    fragment.write_text(
+        textwrap.dedent("""\
+            pipeline:
+                - step: CreateVEnv
+                  run: echo "venv"
+                - step: InstallDeps
+                  run: echo "deps"
+                - step: GenerateSetupScript
+                  run: echo "setup"
+            """)
+    )
+    main = tmp_path / "pypeline.yaml"
+    main.write_text(
+        textwrap.dedent("""\
+            pipeline:
+                - include:
+                    file: bootstrap.pypeline.yaml
+                    steps: [GenerateSetupScript, CreateVEnv]
+            """)
+    )
+    references = (
+        PipelineScheduler[ExecutionContext]
+        .create_pipeline_loader(ProjectConfig.from_file(main).pipeline, tmp_path)
+        .load_steps_references()
+    )
+    assert [ref.name for ref in references] == ["CreateVEnv", "GenerateSetupScript"]
+
+
+def test_include_with_unknown_step_in_filter_raises(tmp_path: Path) -> None:
+    (tmp_path / "bootstrap.pypeline.yaml").write_text(
+        textwrap.dedent("""\
+            pipeline:
+                - step: CreateVEnv
+                  run: echo "venv"
+            """)
+    )
+    main = tmp_path / "pypeline.yaml"
+    main.write_text(
+        textwrap.dedent("""\
+            pipeline:
+                - include:
+                    file: bootstrap.pypeline.yaml
+                    steps: [DoesNotExist]
+            """)
+    )
+    with pytest.raises(UserNotificationException, match="(?i)DoesNotExist"):
+        ProjectConfig.from_file(main)
+
+
 @pytest.mark.parametrize(
     "entry",
     [

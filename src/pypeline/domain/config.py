@@ -1,12 +1,12 @@
 from collections import OrderedDict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, Set
+from typing import Any, Dict, List, Literal, Optional, Set, Union
 
 from py_app_dev.core.config import ConfigElement, parse_config_element
 from py_app_dev.core.exceptions import UserNotificationException
 
-from .pipeline import PipelineConfig, PipelineConfigIterator, PipelineStepConfig
+from .pipeline import IncludeSpec, PipelineConfig, PipelineConfigIterator, PipelineStepConfig
 
 InputType = Literal["string", "integer", "boolean"]
 
@@ -63,15 +63,29 @@ class ProjectConfig(ConfigElement):
             _validate_entry(entry, including_file)
             if entry.include is None:
                 result.append(entry)
-                continue
-            fragment_path = including_file.parent / entry.include
-            fragment = cls._load(fragment_path, visited)
-            if isinstance(fragment.pipeline, OrderedDict):
-                raise UserNotificationException(
-                    f"Included pipeline '{fragment_path}' must define a flat list of steps (no groups) to be included from '{including_file}'."
-                )
-            result.extend(fragment.pipeline)
+            else:
+                result.extend(cls._expand_include(entry.include, including_file, visited))
         return result
+
+    @classmethod
+    def _expand_include(cls, include: Union[str, IncludeSpec], including_file: Path, visited: Set[Path]) -> List[PipelineStepConfig]:
+        # A plain string includes the whole file; an IncludeSpec narrows it to named steps. Coerce to the
+        # object form here so the rest reads one shape, without normalising the config's genuine union away.
+        spec = include if isinstance(include, IncludeSpec) else IncludeSpec(file=include)
+        fragment = cls._load(including_file.parent / spec.file, visited)
+        if isinstance(fragment.pipeline, OrderedDict):
+            raise UserNotificationException(
+                f"Included pipeline '{spec.file}' must define a flat list of steps (no groups) to be included from '{including_file}'."
+            )
+        steps = fragment.pipeline
+        if spec.steps is None:
+            return steps
+        available = [step.step for step in steps]
+        unknown = [name for name in spec.steps if name not in available]
+        if unknown:
+            raise UserNotificationException(f"Included pipeline '{spec.file}' has no step(s) {unknown}. Available steps: {available}.")
+        # Keep the fragment's defined order, not the order the names were listed in.
+        return [step for step in steps if step.step in spec.steps]
 
 
 def _stamp_home_groups(pipeline: PipelineConfig) -> None:

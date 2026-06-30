@@ -103,16 +103,45 @@ pipeline:
     run: uv sync
 ```
 
+### Including only selected steps
+
+An included file often defines more steps than any single pipeline needs. A `bootstrap.pypeline.yaml` might set up the whole environment (create the virtual environment, install dependencies, generate a setup script), but one pipeline only wants the venv and the setup script. Instead of copying those steps or including the whole file, name the ones you want under `steps:`. Only those are included; the rest of the file is ignored:
+
+```yaml
+# pypeline.yaml
+pipeline:
+  - include:
+      file: bootstrap.pypeline.yaml
+      steps: [CreateVEnv, GenerateSetupScript]
+  - step: Build
+    run: cmake --build build
+```
+
+- **Selected steps keep the included file's defined order**, not the order you list them in `steps:`.
+- **An unknown step name is an error**, so a typo or a renamed step fails fast instead of being silently skipped.
+- Omitting `steps:` (or using the plain string form `include: bootstrap.pypeline.yaml`) includes the whole file.
+
+### Include instead of repeating a step
+
+You could copy a step's config into the new file instead of including it, but that has two costs:
+
+- **Duplicated config.** The same step now lives in two places and has to be kept in sync.
+- **A different output location.** A step's output directory (and the `.deps.json` dependency record in it) is keyed to the file where the step is *defined*. Re-declaring the step in another file, especially under a group, gives it a different location, so its incremental cache no longer matches the original and the step re-runs.
+
+Including the step keeps one copy of the config and guarantees the same output location, so the cached result is reused (see the note on output directories below).
+
+### Notes
+
 - **Path** is resolved relative to the **including** file. Includes may be nested (an included file may include another); a cycle is reported as an error.
 - **The included file must define a flat list** of steps (no groups).
-- **A fragment runs both ways.** `bootstrap.pypeline.yaml` is a normal pypeline file, so you can run it on its own (`pypeline run --config-file bootstrap.pypeline.yaml`) *and* include it.
+- **An included file runs both ways.** `bootstrap.pypeline.yaml` is a normal pypeline file, so you can run it on its own (`pypeline run --config-file bootstrap.pypeline.yaml`) *and* include it.
 
 ```{important}
 A step's output directory is determined by the file where the step is **defined**, never by the file that includes it. So a step produces the same outputs — and reuses the same incremental cache — whether you run its file standalone or as part of a larger pipeline. Splicing an include into a group changes execution order only, not where the included steps write.
 ```
 
 ```{note}
-Includes do not defer step-class resolution: a fragment that *installs* the package providing a **later** step cannot bootstrap that step in the same run (the later step's class must already be importable). Use `include:` to organise and reuse steps whose classes are already available.
+Includes do not defer step-class resolution: an included file that *installs* the package providing a **later** step cannot bootstrap that step in the same run (the later step's class must already be importable). Use `include:` to organise and reuse steps whose classes are already available.
 ```
 
 ---
