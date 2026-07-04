@@ -332,7 +332,9 @@ class VirtualEnvironment(ABC):
         subsequent calls to `pip` and `run` operate within this environment.
         """
         try:
-            venv.create(env_dir=self.venv_dir, with_pip=True)
+            # Symlink on POSIX (like the `python -m venv` CLI). Copying the python binary breaks
+            # relocatable interpreters (e.g. uv-managed) which find libpython relative to the executable.
+            venv.create(env_dir=self.venv_dir, with_pip=True, symlinks=os.name != "nt")
             self.gitignore_configure()
         except PermissionError as e:
             if "python.exe" in str(e):
@@ -495,7 +497,8 @@ class CreateBootstrapEnvironment(Runnable):
             bootstrap_venv = instantiate_os_specific_venv(self.venv_dir)
 
             logger.info(f"Creating bootstrap environment in {self.bootstrap_env_dir}")
-            venv.create(env_dir=self.venv_dir, with_pip=True)
+            # See VirtualEnvironment.create for why symlinks are required on POSIX
+            venv.create(env_dir=self.venv_dir, with_pip=True, symlinks=os.name != "nt")
 
             # Configure pip with PyPI source if available
             pypi_source = PyPiSourceParser.from_pyproject(self.project_dir)
