@@ -115,6 +115,13 @@ class CreateVEnv(PipelineStep[ExecutionContext]):
     }
 
     def __init__(self, execution_context: ExecutionContext, group_name: str, config: Optional[Dict[str, Any]] = None) -> None:
+        # Catch the YAML trap before deserialization coerces the float to a string:
+        # an unquoted python_version 3.10 is parsed as the number 3.1.
+        if config and isinstance(config.get("python_version"), float):
+            raise UserNotificationException(
+                f"'python_version: {config['python_version']}' was read as a number, which loses trailing zeros "
+                f'(YAML parses 3.10 as 3.1). Please quote the version: python_version: "{config["python_version"]}"'
+            )
         self.user_config = CreateVEnvConfig.from_dict(config) if config else CreateVEnvConfig()
         if self.user_config.bootstrap_script:
             self.user_config.bootstrap_script = self.user_config.bootstrap_script.replace("\\", "/")

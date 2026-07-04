@@ -27,6 +27,12 @@ def test_create_venv_with_custom_script(execution_context: Mock, bootstrap_scrip
     )
 
 
+def test_create_venv_rejects_unquoted_python_version(execution_context: Mock) -> None:
+    # YAML parses an unquoted python_version 3.10 as the float 3.1
+    with pytest.raises(UserNotificationException, match="Please quote the version"):
+        CreateVEnv(execution_context, "group_name", {"python_version": 3.1})
+
+
 def test_create_venv_auto_creates_missing_custom_script(execution_context: Mock) -> None:
     bootstrap_script = "custom_bootstrap.py"
     config = {"bootstrap_script": bootstrap_script}
