@@ -90,7 +90,7 @@ One of `module`, `file`, or `run` is required.
 
 ## Including Other Pipeline Files
 
-A `pipeline` entry can pull in the steps of another pypeline file with `include:` instead of `step:`. The included steps are spliced in **at that position**, so where the `include` sits is where its steps run:
+A `pipeline` entry can pull in the steps of another pypeline file with `include:` instead of `step:`. The included steps are inserted **at that position**, so where the `include` sits is where its steps run:
 
 ```yaml
 # pypeline.yaml
@@ -123,7 +123,7 @@ pipeline:
     run: cmake --build build
 ```
 
-- **Selected steps keep the included file's defined order**, not the order you list them in `steps:`.
+- **Selected steps run in the order you list them in `steps:`**, not the included file's defined order. Listing a step twice runs it twice (handy for e.g. a print-environment step before and after an install step).
 - **An unknown step name is an error**, so a typo or a renamed step fails fast instead of being silently skipped.
 - Omitting `steps:` (or using the plain string form `include: bootstrap.pypeline.yaml`) includes the whole file.
 

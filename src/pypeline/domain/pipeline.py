@@ -30,9 +30,9 @@ from .execution_context import ExecutionContext
 class IncludeSpec(ConfigElement):
     """Object form of ``include``: pull in only ``steps`` from ``file`` (all steps when ``steps`` is omitted)."""
 
-    #: Path to another pypeline file whose steps are spliced in
+    #: Path to another pypeline file whose steps are included
     file: str
-    #: Names of the steps to splice in; when omitted, every step of the file is included
+    #: Names of the steps to include, in this order; when omitted, every step of the file is included
     steps: Optional[List[str]] = None
 
 
@@ -45,7 +45,7 @@ RunCommandSpec: TypeAlias = Union[str, List[str]]
 class PipelineStepConfig(ConfigElement):
     #: Step name or class name if file is not specified
     step: Optional[str] = None
-    #: Another pypeline file whose steps are spliced in at this position (instead of a step). A plain
+    #: Another pypeline file whose steps are inserted at this position (instead of a step). A plain
     #: string includes the whole file; an :class:`IncludeSpec` includes only its named steps.
     include: Optional[Union[str, IncludeSpec]] = None
     #: Path to file with step class
@@ -78,7 +78,7 @@ class PipelineStepConfig(ConfigElement):
     config: Optional[Dict[str, Any]] = None
     #: Output group taken from the file where the step is *defined*, not the file that includes
     #: it, so the step's output directory is identical whether its file is run standalone or
-    #: spliced into a larger pipeline. Assembly metadata: set during loading, never serialized.
+    #: included into a larger pipeline. Assembly metadata: set during loading, never serialized.
     home_group: Optional[str] = field(default=None, compare=False, repr=False)
     _home_group_set: bool = field(default=False, compare=False, repr=False)
 

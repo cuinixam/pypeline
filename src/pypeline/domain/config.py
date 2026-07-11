@@ -44,8 +44,8 @@ class ProjectConfig(ConfigElement):
             chain = " -> ".join(str(path) for path in (*visited, resolved))
             raise UserNotificationException(f"Circular pipeline include detected: {chain}")
         config = parse_config_element(cls, config_file)
-        # Pin each step's output group to THIS file before splicing in any included steps, so an
-        # included step keeps the group of the file it is defined in, not the one it is spliced into.
+        # Pin each step's output group to THIS file before inserting any included steps, so an
+        # included step keeps the group of the file it is defined in, not the one it is included into.
         _stamp_home_groups(config.pipeline)
         config.pipeline = cls._expand_includes(config.pipeline, config_file, visited | {resolved})
         return config
@@ -84,8 +84,9 @@ class ProjectConfig(ConfigElement):
         unknown = [name for name in spec.steps if name not in available]
         if unknown:
             raise UserNotificationException(f"Included pipeline '{spec.file}' has no step(s) {unknown}. Available steps: {available}.")
-        # Keep the fragment's defined order, not the order the names were listed in.
-        return [step for step in steps if step.step in spec.steps]
+        # The selection list dictates execution order; a name listed twice runs the step twice.
+        by_name = {step.step: step for step in steps}
+        return [by_name[name] for name in spec.steps]
 
 
 def _stamp_home_groups(pipeline: PipelineConfig) -> None:

@@ -432,7 +432,7 @@ def _loaded_group_of(config_file: Path, step_name: str) -> Optional[str]:
 
 def test_included_step_output_group_is_identical_standalone_and_included(tmp_path: Path) -> None:
     # The invariant: a fragment's step must land in the same output dir whether the fragment
-    # is run on its own or spliced into a group of a larger pipeline, so its cache is shared.
+    # is run on its own or included into a group of a larger pipeline, so its cache is shared.
     fragment = tmp_path / "bootstrap.pypeline.yaml"
     fragment.write_text(
         textwrap.dedent("""\
@@ -474,7 +474,7 @@ def test_single_file_grouped_output_group_unchanged(tmp_path: Path) -> None:
     assert _loaded_group_of(config_file, "Generate") == "gen"
 
 
-def test_include_splices_in_position_order(tmp_path: Path) -> None:
+def test_include_inserts_steps_in_position_order(tmp_path: Path) -> None:
     fragment = tmp_path / "bootstrap.pypeline.yaml"
     fragment.write_text(
         textwrap.dedent("""\
@@ -616,7 +616,7 @@ def test_grouped_fragment_is_rejected(tmp_path: Path) -> None:
         ProjectConfig.from_file(main)
 
 
-def test_include_with_steps_filter_splices_only_named_steps_in_fragment_order(tmp_path: Path) -> None:
+def test_include_with_steps_filter_includes_named_steps_in_selection_order(tmp_path: Path) -> None:
     fragment = tmp_path / "bootstrap.pypeline.yaml"
     fragment.write_text(
         textwrap.dedent("""\
@@ -635,7 +635,7 @@ def test_include_with_steps_filter_splices_only_named_steps_in_fragment_order(tm
             pipeline:
                 - include:
                     file: bootstrap.pypeline.yaml
-                    steps: [GenerateSetupScript, CreateVEnv]
+                    steps: [GenerateSetupScript, CreateVEnv, GenerateSetupScript]
             """)
     )
     references = (
@@ -643,7 +643,8 @@ def test_include_with_steps_filter_splices_only_named_steps_in_fragment_order(tm
         .create_pipeline_loader(ProjectConfig.from_file(main).pipeline, tmp_path)
         .load_steps_references()
     )
-    assert [ref.name for ref in references] == ["CreateVEnv", "GenerateSetupScript"]
+    # Selection order dictates execution order; a name listed twice runs the step twice.
+    assert [ref.name for ref in references] == ["GenerateSetupScript", "CreateVEnv", "GenerateSetupScript"]
 
 
 def test_include_with_unknown_step_in_filter_raises(tmp_path: Path) -> None:
