@@ -39,7 +39,7 @@ def resolve_input_placeholders(text: str, inputs: Dict[str, Any], step_name: str
     """Resolve ``${{ inputs.<name> }}`` placeholders so one `run:` command serves parameterized runs (e.g. a CI matrix)."""
 
     def replace(match: re.Match[str]) -> str:
-        reference = match.group(1)
+        reference, pipe_separator, filter_name = (part.strip() for part in match.group(1).partition("|"))
         context, _, input_name = reference.partition(".")
         if context != "inputs" or not input_name:
             raise UserNotificationException(f"Step '{step_name}': unsupported placeholder '${{{{ {reference} }}}}' in '{text}'. Only 'inputs.<name>' references are supported.")
@@ -48,6 +48,12 @@ def resolve_input_placeholders(text: str, inputs: Dict[str, Any], step_name: str
         value = inputs[input_name]
         if value is None:
             raise UserNotificationException(f"Step '{step_name}': input '{input_name}' has no value. Pass it with '-i {input_name}=<value>' or declare a default.")
+        if filter_name == "flag":
+            if not isinstance(value, bool):
+                raise UserNotificationException(f"Step '{step_name}': the 'flag' filter only applies to boolean inputs, but '{input_name}' is not a boolean.")
+            return f"--{input_name}" if value else ""
+        if pipe_separator:
+            raise UserNotificationException(f"Step '{step_name}': unsupported filter '{filter_name}' in '{text}'. Only 'flag' is supported.")
         return str(value).lower() if isinstance(value, bool) else str(value)
 
     resolved = INPUT_PLACEHOLDER_PATTERN.sub(replace, text)
@@ -64,7 +70,10 @@ def parse_run_commands(run_spec: RunCommandSpec, inputs: Dict[str, Any], step_na
     and substitution must happen before shlex so whitespace inside ``${{ ... }}`` survives.
     """
     if isinstance(run_spec, list):
-        return [[resolve_input_placeholders(token, inputs, step_name) for token in run_spec]]
+        resolved_tokens = [resolve_input_placeholders(token, inputs, step_name) for token in run_spec]
+        # If a placeholder resolves to nothing (a false `| flag`), remove the token.
+        # A token that was already empty in the yaml file is kept as an empty argument.
+        return [[resolved for original, resolved in zip(run_spec, resolved_tokens) if resolved or not original]]
     commands = []
     for line in filter(str.strip, run_spec.splitlines()):
         resolved = resolve_input_placeholders(line, inputs, step_name)

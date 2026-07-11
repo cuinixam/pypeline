@@ -22,6 +22,8 @@ from pypeline.pypeline import PipelineScheduler, PipelineStepsExecutor, parse_ru
         ("--verbose ${{ inputs.verbose }}", {"verbose": True}, "--verbose true"),
         ("--jobs ${{ inputs.jobs }}", {"jobs": 4}, "--jobs 4"),
         ("echo 'no placeholders here'", {}, "echo 'no placeholders here'"),
+        ("${{ inputs.verbose | flag }}", {"verbose": True}, "--verbose"),
+        ("${{ inputs.verbose|flag }}", {"verbose": False}, ""),
     ],
 )
 def test_resolve_input_placeholders(text: str, inputs: Dict[str, Any], expected: str) -> None:
@@ -35,6 +37,8 @@ def test_resolve_input_placeholders(text: str, inputs: Dict[str, Any], expected:
         ("echo ${{ env.HOME }}", {}, r"unsupported placeholder"),
         ("--profile ${{ inputs.profile }}", {"profile": None}, r"input 'profile' has no value"),
         ("--flag ${{ inputs.profile }", {"profile": "x"}, r"malformed placeholder"),
+        ("${{ inputs.verbose | upper }}", {"verbose": True}, r"unsupported filter 'upper'"),
+        ("${{ inputs.profile | flag }}", {"profile": "full"}, r"'flag' filter only applies to boolean inputs"),
     ],
 )
 def test_resolve_input_placeholders_errors(text: str, inputs: Dict[str, Any], error_match: str) -> None:
@@ -51,6 +55,11 @@ def test_resolve_input_placeholders_errors(text: str, inputs: Dict[str, Any], er
             [["check-tool", "--profile", "full"], ["report-tool", "--title", "'Nightly Run'" if os.name == "nt" else "Nightly Run"]],
         ),
         (["check-tool", "--select", "${{ inputs.filter }}"], {"filter": "group a"}, [["check-tool", "--select", "group a"]]),
+        ("pytest ${{ inputs.verbose | flag }} tests", {"verbose": True}, [["pytest", "--verbose", "tests"]]),
+        ("pytest ${{ inputs.verbose | flag }} tests", {"verbose": False}, [["pytest", "tests"]]),
+        (["pytest", "${{ inputs.verbose | flag }}", "tests"], {"verbose": True}, [["pytest", "--verbose", "tests"]]),
+        (["pytest", "${{ inputs.verbose | flag }}", "tests"], {"verbose": False}, [["pytest", "tests"]]),
+        (["check-tool", "--select", ""], {}, [["check-tool", "--select", ""]]),
     ],
 )
 def test_parse_run_commands(run_spec: RunCommandSpec, inputs: Dict[str, Any], expected: List[List[str]]) -> None:
