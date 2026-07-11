@@ -36,6 +36,11 @@ class IncludeSpec(ConfigElement):
     steps: Optional[List[str]] = None
 
 
+#: A step's ``run:`` field as authored in the pipeline config: one command per line
+#: (string, possibly multiline) or a single command as a list of arguments.
+RunCommandSpec: TypeAlias = Union[str, List[str]]
+
+
 @dataclass
 class PipelineStepConfig(ConfigElement):
     #: Step name or class name if file is not specified
@@ -64,7 +69,7 @@ class PipelineStepConfig(ConfigElement):
     #:     run: |
     #:       ruff check .
     #:       pytest -v --cov
-    run: Optional[Union[str, List[str]]] = None
+    run: Optional[RunCommandSpec] = None
     #: Step description
     description: Optional[str] = None
     #: Step timeout in seconds

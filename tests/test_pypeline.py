@@ -242,7 +242,7 @@ def test_pipeline_create_run_command_step_class(execution_context: ExecutionCont
     executor = PipelineStepsExecutor[ExecutionContext](
         execution_context,
         [
-            PipelineStepReference("my_cmd", cast(Type[PipelineStep[ExecutionContext]], RunCommandClassFactory._create_run_commands_step_class([["echo 'Hello'"]], "Echo"))),
+            PipelineStepReference("my_cmd", cast(Type[PipelineStep[ExecutionContext]], RunCommandClassFactory._create_run_commands_step_class("echo 'Hello'", "Echo"))),
         ],
     )
     executor.run()

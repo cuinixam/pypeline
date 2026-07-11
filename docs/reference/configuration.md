@@ -78,7 +78,13 @@ One of `module`, `file`, or `run` is required.
   run: |
     ruff check .
     pytest -v --cov
+
+# Reference declared inputs (GitHub Actions style)
+- step: RunChecks
+  run: check-tool --profile ${{ inputs.profile }}
 ```
+
+`${{ inputs.<name> }}` placeholders resolve from the top-level `inputs:` declarations (CLI `-i` values or defaults) when the step executes. Only the `inputs.` context is supported; unknown or unset inputs fail the step. See [Configure Pipeline Inputs](../how_to/configure_inputs.md).
 
 ---
 

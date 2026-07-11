@@ -1,4 +1,5 @@
 import os
+import re
 import shlex
 from pathlib import Path
 from typing import (
@@ -18,7 +19,60 @@ from py_app_dev.core.runnable import Executor
 
 from .domain.artifacts import ProjectArtifactsLocator
 from .domain.execution_context import ExecutionContext
-from .domain.pipeline import PipelineConfig, PipelineConfigIterator, PipelineLoader, PipelineStep, PipelineStepConfig, PipelineStepReference, StepClassFactory, TExecutionContext
+from .domain.pipeline import (
+    PipelineConfig,
+    PipelineConfigIterator,
+    PipelineLoader,
+    PipelineStep,
+    PipelineStepConfig,
+    PipelineStepReference,
+    RunCommandSpec,
+    StepClassFactory,
+    TExecutionContext,
+)
+
+#: GitHub-Actions-style placeholder: ``${{ <reference> }}``, whitespace-tolerant.
+INPUT_PLACEHOLDER_PATTERN = re.compile(r"\$\{\{\s*(.+?)\s*\}\}")
+
+
+def resolve_input_placeholders(text: str, inputs: Dict[str, Any], step_name: str) -> str:
+    """Resolve ``${{ inputs.<name> }}`` placeholders so one `run:` command serves parameterized runs (e.g. a CI matrix)."""
+
+    def replace(match: re.Match[str]) -> str:
+        reference = match.group(1)
+        context, _, input_name = reference.partition(".")
+        if context != "inputs" or not input_name:
+            raise UserNotificationException(f"Step '{step_name}': unsupported placeholder '${{{{ {reference} }}}}' in '{text}'. Only 'inputs.<name>' references are supported.")
+        if input_name not in inputs:
+            raise UserNotificationException(f"Step '{step_name}': unknown input '{input_name}' in '{text}'. Declare it under 'inputs:' or pass it with '-i {input_name}=<value>'.")
+        value = inputs[input_name]
+        if value is None:
+            raise UserNotificationException(f"Step '{step_name}': input '{input_name}' has no value. Pass it with '-i {input_name}=<value>' or declare a default.")
+        return str(value).lower() if isinstance(value, bool) else str(value)
+
+    resolved = INPUT_PLACEHOLDER_PATTERN.sub(replace, text)
+    if "${{" in resolved:
+        raise UserNotificationException(f"Step '{step_name}': malformed placeholder in '{text}'. Use the form '${{{{ inputs.<name> }}}}'.")
+    return resolved
+
+
+def parse_run_commands(run_spec: RunCommandSpec, inputs: Dict[str, Any], step_name: str) -> List[List[str]]:
+    """
+    Convert a step's `run:` field into subprocess commands: resolve input placeholders, then split.
+
+    Runs at step execution (not load) because placeholder values come from the run's inputs,
+    and substitution must happen before shlex so whitespace inside ``${{ ... }}`` survives.
+    """
+    if isinstance(run_spec, list):
+        return [[resolve_input_placeholders(token, inputs, step_name) for token in run_spec]]
+    commands = []
+    for line in filter(str.strip, run_spec.splitlines()):
+        resolved = resolve_input_placeholders(line, inputs, step_name)
+        try:
+            commands.append(shlex.split(resolved, posix=(os.name != "nt")))
+        except ValueError as exc:
+            raise UserNotificationException(f"Step '{step_name}': could not parse command '{resolved}': {exc}") from exc
+    return commands
 
 
 class RunCommandClassFactory(StepClassFactory[PipelineStep[TExecutionContext]]):
@@ -27,27 +81,22 @@ class RunCommandClassFactory(StepClassFactory[PipelineStep[TExecutionContext]]):
         step_name = step_config.class_name or step_config.step
         if not step_name:
             raise UserNotificationException("A pipeline step must define a 'step' name. Please check your pipeline configuration.")
-        if step_config.run is not None:
-            if isinstance(step_config.run, str):
-                lines = [line for line in step_config.run.splitlines() if line.strip()]
-                if not lines:
-                    raise UserNotificationException(f"Step '{step_name}' has an empty `run` block. Please provide at least one command.")
-                commands = [shlex.split(line, posix=(os.name != "nt")) for line in lines]
-            else:
-                commands = [step_config.run]
-            return self._create_run_commands_step_class(commands, step_name)
-        raise UserNotificationException(f"Step '{step_name}' has no `run` command defined. Please check your pipeline configuration.")
+        if step_config.run is None:
+            raise UserNotificationException(f"Step '{step_name}' has no `run` command defined. Please check your pipeline configuration.")
+        if isinstance(step_config.run, str) and not step_config.run.strip():
+            raise UserNotificationException(f"Step '{step_name}' has an empty `run` block. Please provide at least one command.")
+        return self._create_run_commands_step_class(step_config.run, step_name)
 
     @staticmethod
-    def _create_run_commands_step_class(commands: List[List[str]], name: str) -> Type[PipelineStep[ExecutionContext]]:
-        """Dynamically creates a step class that runs multiple commands sequentially."""
+    def _create_run_commands_step_class(run_spec: RunCommandSpec, name: str) -> Type[PipelineStep[ExecutionContext]]:
+        """Dynamically creates a step class that runs the configured commands sequentially."""
 
         class TmpDynamicRunCommandsStep(PipelineStep[ExecutionContext]):
-            """A simple step that runs multiple commands sequentially."""
+            """A simple step that runs the configured commands sequentially."""
 
             def __init__(self, execution_context: ExecutionContext, group_name: str, config: Optional[Dict[str, Any]] = None) -> None:
                 super().__init__(execution_context, group_name, config)
-                self.commands = commands
+                self.run_spec = run_spec
                 self.name = name
 
             def get_needs_dependency_management(self) -> bool:
@@ -55,7 +104,7 @@ class RunCommandClassFactory(StepClassFactory[PipelineStep[TExecutionContext]]):
                 return False
 
             def run(self) -> int:
-                for command in self.commands:
+                for command in parse_run_commands(self.run_spec, self.execution_context.inputs, self.name):
                     self.execution_context.create_process_executor(
                         command,  # type: ignore
                         cwd=self.project_root_dir,

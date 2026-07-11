@@ -160,6 +160,19 @@ pipeline:
     file: steps/deploy.py
 ```
 
+### Inputs in `run:` commands (GitHub-Actions-style)
+```yaml
+inputs:
+  profile:
+    type: string
+    default: quick
+
+pipeline:
+  - step: RunChecks
+    run: check-tool --profile ${{ inputs.profile }}
+```
+Only the `inputs.` context is supported (no expressions); unknown/unset inputs fail the step. Quote the placeholder if the value may contain spaces.
+
 ## Running Pipelines
 
 ```bash
