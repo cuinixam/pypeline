@@ -1,5 +1,6 @@
 import sys
 import textwrap
+import time
 from pathlib import Path
 from typing import List
 
@@ -50,6 +51,75 @@ def test_run_multiple_steps(artifacts_locator: ProjectArtifactsLocator) -> None:
         ],
     )
     assert result.exit_code == 0
+
+
+@pytest.fixture
+def project_with_env_step(project: Path) -> Path:
+    """Project with a single step exporting PYPELINE_TEST_VAR and a script writing it to the file given as argument."""
+    project.joinpath("pypeline.yaml").write_text(
+        textwrap.dedent("""\
+            pipeline:
+                - step: MyEnvStep
+                  file: my_python_file.py
+            """)
+    )
+    project.joinpath("write_env_var_to_file.py").write_text("import os, pathlib, sys; pathlib.Path(sys.argv[1]).write_text(os.environ['PYPELINE_TEST_VAR'])")
+    return project
+
+
+def test_run_command_runs_as_last_step_with_the_pipeline_environment(project_with_env_step: Path) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            "--project-dir",
+            project_with_env_step.as_posix(),
+            "--command",
+            "python write_env_var_to_file.py command.txt",
+        ],
+    )
+    assert result.exit_code == 0
+    assert project_with_env_step.joinpath("command.txt").read_text() == "from_step"
+
+
+@pytest.mark.parametrize("option", ["--command", "--application"])
+def test_run_dry_run_neither_runs_the_command_nor_starts_the_application(project_with_env_step: Path, option: str) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            "--project-dir",
+            project_with_env_step.as_posix(),
+            "--dry-run",
+            option,
+            "python write_env_var_to_file.py dry_run.txt",
+        ],
+    )
+    assert result.exit_code == 0
+
+    time.sleep(0.3)  # A started process would have written the file long before this
+    assert not project_with_env_step.joinpath("dry_run.txt").exists()
+
+
+def test_run_application_is_spawned_detached_with_the_pipeline_environment(project_with_env_step: Path) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            "--project-dir",
+            project_with_env_step.as_posix(),
+            "--application",
+            "python write_env_var_to_file.py application.txt",
+        ],
+    )
+    assert result.exit_code == 0
+
+    written_file = project_with_env_step.joinpath("application.txt")
+    for _ in range(100):
+        if written_file.exists():
+            break
+        time.sleep(0.1)
+    assert written_file.read_text() == "from_step", "The detached application shall run with the environment collected by the pipeline"
 
 
 def test_run_custom_config_file(artifacts_locator: ProjectArtifactsLocator) -> None:

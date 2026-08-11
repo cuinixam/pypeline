@@ -71,6 +71,9 @@ def project(tmp_path: Path) -> Path:
                     data = self.execution_context.data_registry.find_data(MyData)
                     if not data:
                         raise ValueError("Data not found")
+            class MyEnvStep(BaseStep):
+                def update_execution_context(self) -> None:
+                    self.execution_context.add_env_vars({"PYPELINE_TEST_VAR": "from_step"})
             class MyInputsChecker(BaseStep):
                 def run(self) -> None:
                     input = self.execution_context.inputs.get("my_input")

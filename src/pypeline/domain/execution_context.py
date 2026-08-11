@@ -30,13 +30,16 @@ class ExecutionContext:
     def add_env_vars(self, env_vars: Dict[str, Any]) -> None:
         self.env_vars.update(env_vars)
 
-    def create_process_executor(self, command: List[str | Path], cwd: Optional[Path] = None) -> SubprocessExecutor:
+    def create_process_env(self) -> Dict[str, str]:
         env = os.environ.copy()
         env.update(self.env_vars)
         env["PATH"] = os.pathsep.join([path.absolute().as_posix() for path in self.install_dirs] + [env["PATH"]])
+        return env
+
+    def create_process_executor(self, command: List[str | Path], cwd: Optional[Path] = None) -> SubprocessExecutor:
         # When started from a windows shell (e.g. cmd on Jenkins) the shell parameter must be set to True
         shell = True if os.name == "nt" else False
-        return SubprocessExecutor(command, cwd=cwd, env=env, shell=shell)
+        return SubprocessExecutor(command, cwd=cwd, env=self.create_process_env(), shell=shell)
 
     def create_artifacts_locator(self) -> ProjectArtifactsLocator:
         return ProjectArtifactsLocator(self.project_root_dir)

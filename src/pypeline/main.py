@@ -1,6 +1,9 @@
+import os
+import shlex
+import subprocess
 import sys
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 import typer
 from py_app_dev.core.exceptions import UserNotificationException
@@ -8,17 +11,35 @@ from py_app_dev.core.logging import logger, setup_logger, time_it
 
 from pypeline import __version__
 from pypeline.domain.execution_context import ExecutionContext
-from pypeline.domain.pipeline import PipelineConfigIterator
+from pypeline.domain.pipeline import PipelineConfigIterator, PipelineStepConfig, PipelineStepReference
 from pypeline.domain.project_slurper import ProjectSlurper
 from pypeline.inputs_parser import InputsParser
 from pypeline.kickstart.create import KickstartProject
-from pypeline.pypeline import PipelineScheduler, PipelineStepsExecutor
+from pypeline.pypeline import PipelineScheduler, PipelineStepsExecutor, RunCommandClassFactory
 
 package_name = "pypeline"
 
 
 def package_version_file() -> Path:
     return Path(__file__).parent / "__init__.py"
+
+
+def start_detached_process(command: List[str], env: Dict[str, str], cwd: Path) -> None:
+    """Start a process which outlives pypeline, e.g. an IDE which needs the tools installed by the pipeline in its PATH."""
+    logger.info(f"Starting detached process: {' '.join(command)}")
+    # A new process group (Windows) or session (POSIX) detaches the child, so it survives pypeline exiting.
+    if sys.platform == "win32":
+        creation_flags = subprocess.CREATE_NEW_PROCESS_GROUP
+    else:
+        creation_flags = 0
+    subprocess.Popen(
+        command,
+        cwd=cwd,
+        env=env,
+        shell=True if os.name == "nt" else False,  # noqa: S603 # The command comes from the user, same as for any other pipeline step.
+        creationflags=creation_flags,
+        start_new_session=os.name != "nt",
+    )
 
 
 app = typer.Typer(
@@ -60,6 +81,8 @@ def run(
         "-i",
         help="Provide input parameters as key=value pairs (e.g., -i name=value -i flag=true).",
     ),
+    command: Optional[str] = typer.Option(None, help="Command to run as last pipeline step. Pypeline waits for it to finish."),
+    application: Optional[str] = typer.Option(None, help="Application to start once the pipeline finished. It is started as detached process, pypeline does not wait for it."),
 ) -> None:
     project_dir = project_dir.absolute()
     project_slurper = ProjectSlurper(project_dir, config_file)
@@ -75,7 +98,10 @@ def run(
         raise UserNotificationException("No pipeline found in the configuration.")
     # Schedule the steps to run
     steps_references = PipelineScheduler[ExecutionContext](project_slurper.pipeline, project_dir).get_steps_to_run(step, single)
-    if not steps_references:
+    if command:
+        command_step_class = RunCommandClassFactory().create_step_class(PipelineStepConfig(step="Command", run=command), project_dir)
+        steps_references.append(PipelineStepReference(None, command_step_class))
+    if not steps_references and not application:
         logger.info("No steps to run.")
         return
     # Parse the inputs
@@ -86,7 +112,14 @@ def run(
         inputs_dict = InputsParser.from_inputs_definitions(input_definitions).parse_inputs(inputs)
     else:
         inputs_dict = {}
-    PipelineStepsExecutor[ExecutionContext](ExecutionContext(project_dir, inputs=inputs_dict), steps_references, force_run, dry_run).run()
+    execution_context = ExecutionContext(project_dir, inputs=inputs_dict)
+    PipelineStepsExecutor[ExecutionContext](execution_context, steps_references, force_run, dry_run).run()
+    if application and not dry_run:
+        try:
+            application_command = shlex.split(application, posix=(os.name != "nt"))
+        except ValueError as exc:
+            raise UserNotificationException(f"Could not parse the application command '{application}': {exc}") from exc
+        start_detached_process(application_command, execution_context.create_process_env(), project_dir)
 
 def main() -> None:
     try:
