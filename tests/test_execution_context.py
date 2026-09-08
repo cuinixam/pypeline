@@ -31,6 +31,26 @@ def test_create_process_executor_with_env_vars(project: Path) -> None:
     assert "value" in subprocess_executor.env.values()
 
 
+def test_install_dirs_keep_call_order(project: Path) -> None:
+    context = ExecutionContext(project_root_dir=project)
+    context.add_install_dirs([Path("first")])
+    context.add_install_dirs([Path("second")])
+
+    path = context.create_process_env()["PATH"]
+    assert path.index("first") < path.index("second")
+
+
+def test_prepended_install_dirs_win_over_earlier_steps(project: Path) -> None:
+    context = ExecutionContext(project_root_dir=project)
+    # A tool installer (e.g. ScoopInstall) runs first and provides its own Python
+    context.add_install_dirs([Path("scoop/apps/python311/current")])
+    # The virtual environment is created afterwards but must still come first on PATH
+    context.add_install_dirs([Path(".venv/Scripts")], prepend=True)
+
+    path = context.create_process_env()["PATH"]
+    assert path.index(".venv/Scripts") < path.index("python311")
+
+
 class SomeData:
     def __init__(self, data: str) -> None:
         self.data = data

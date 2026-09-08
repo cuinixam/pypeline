@@ -428,7 +428,9 @@ class CreateVEnv(PipelineStep[ExecutionContext]):
         return None
 
     def update_execution_context(self) -> None:
-        self.execution_context.add_install_dirs(self.install_dirs)
+        # The project virtual environment shall take precedence over tools installed by other steps,
+        # independent of the order in which the steps run.
+        self.execution_context.add_install_dirs(self.install_dirs, prepend=True)
 
     def get_needs_dependency_management(self) -> bool:
         # Always return False - the bootstrap script handles dependency management internally

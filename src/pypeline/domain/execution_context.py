@@ -24,8 +24,17 @@ class ExecutionContext:
     def get_input(self, name: str) -> Optional[Any]:
         return self.inputs.get(name, None)
 
-    def add_install_dirs(self, install_dirs: List[Path]) -> None:
-        self.install_dirs.extend(install_dirs)
+    def add_install_dirs(self, install_dirs: List[Path], prepend: bool = False) -> None:
+        """
+        Register directories to be added to the PATH of the subsequent steps.
+
+        prepend: place these directories ahead of the ones registered by earlier steps,
+        so that their PATH precedence does not depend on the pipeline step order.
+        """
+        if prepend:
+            self.install_dirs[:0] = install_dirs
+        else:
+            self.install_dirs.extend(install_dirs)
 
     def add_env_vars(self, env_vars: Dict[str, Any]) -> None:
         self.env_vars.update(env_vars)

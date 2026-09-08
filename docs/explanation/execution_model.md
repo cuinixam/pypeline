@@ -81,3 +81,10 @@ The executor automatically:
 - Adds `install_dirs` to PATH
 - Injects `env_vars`
 - Handles Windows/Unix shell differences
+
+### PATH order
+
+`install_dirs` are placed before the inherited PATH, in the order the steps registered them.
+A step can call `add_install_dirs(dirs, prepend=True)` to be placed before the directories of
+the steps that ran earlier. `CreateVEnv` does this, so the project virtual environment always
+takes precedence over tools installed by other steps, whatever order the steps run in.
