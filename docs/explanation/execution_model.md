@@ -87,5 +87,9 @@ The executor automatically:
 `install_dirs` are placed before the inherited PATH, sorted by their order: the lowest order comes first.
 `add_install_dirs` takes plain paths, which get the default order 50, or `InstallDir(path, order)`.
 Directories with the same order keep the order in which they were registered.
+A directory registered more than once appears once in PATH, with its lowest order.
+`install_dirs` is read-only, so `add_install_dirs` is the only way to register a directory.
 `CreateVEnv` registers its directories with order 0, so the project virtual environment takes
 precedence over tools installed by other steps, whatever order the steps run in.
+Steps register through `PipelineStep.add_install_dirs`, so a user can override a step's order
+with `install_dirs_order` in the step config (see the configuration reference).

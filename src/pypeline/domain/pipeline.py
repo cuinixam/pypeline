@@ -12,6 +12,7 @@ from typing import (
     Optional,
     OrderedDict,
     Protocol,
+    Sequence,
     Tuple,
     Type,
     TypeAlias,
@@ -23,7 +24,7 @@ from py_app_dev.core.config import ConfigElement
 from py_app_dev.core.exceptions import UserNotificationException
 from py_app_dev.core.runnable import Runnable
 
-from .execution_context import ExecutionContext
+from .execution_context import DEFAULT_INSTALL_DIR_ORDER, ExecutionContext, InstallDir
 
 
 @dataclass
@@ -222,6 +223,15 @@ class PipelineStep(Generic[TExecutionContext], Runnable):
         if self.group_name:
             output_dir = output_dir / self.group_name
         return output_dir
+
+    def add_install_dirs(self, install_dirs: Sequence[Path], order: int = DEFAULT_INSTALL_DIR_ORDER) -> None:
+        """Register the step's install directories with the given PATH order, unless the step config sets ``install_dirs_order``."""
+        config_order = (self.config or {}).get("install_dirs_order")
+        if config_order is not None:
+            if not isinstance(config_order, int) or isinstance(config_order, bool):
+                raise UserNotificationException(f"Step '{self.get_name()}': 'install_dirs_order' must be an integer, got '{config_order}'.")
+            order = config_order
+        self.execution_context.add_install_dirs([InstallDir(path, order) for path in install_dirs])
 
     @abstractmethod
     def update_execution_context(self) -> None:

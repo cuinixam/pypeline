@@ -311,6 +311,6 @@ class WestInstall(PipelineStep[TContext], Generic[TContext]):
             return
         result = WestInstallResult.from_json_file(self._install_result_file)
         if result.installed_dirs:
-            self.execution_context.add_install_dirs(list(dict.fromkeys(result.installed_dirs)))
+            self.add_install_dirs(list(dict.fromkeys(result.installed_dirs)))
         for project in result.installed_projects:
             self.execution_context.data_registry.insert(project, provider=self.get_name())

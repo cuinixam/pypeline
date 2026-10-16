@@ -58,16 +58,16 @@ def test_install_dirs_with_same_order_keep_registration_order(project: Path) -> 
     context.add_install_dirs([InstallDir(Path("first"), 0)])
     context.add_install_dirs([InstallDir(Path("C"), 13)])
 
-    assert context.install_dirs == [Path("first"), Path("A"), Path("B"), Path("C"), Path("default")]
+    assert context.install_dirs == (Path("first"), Path("A"), Path("B"), Path("C"), Path("default"))
 
 
-def test_install_dir_registered_twice_keeps_its_lowest_order(project: Path) -> None:
+def test_install_dir_registered_twice_appears_once_with_its_lowest_order(project: Path) -> None:
     context = ExecutionContext(project_root_dir=project)
     context.add_install_dirs([Path("tool")])
     context.add_install_dirs([InstallDir(Path(".venv/Scripts"), order=0)])
     context.add_install_dirs([Path(".venv/Scripts")])
 
-    assert context.install_dirs == [Path(".venv/Scripts"), Path(".venv/Scripts"), Path("tool")]
+    assert context.install_dirs == (Path(".venv/Scripts"), Path("tool"))
 
 
 class SomeData:

@@ -43,6 +43,17 @@ A malformed `pypeline.yaml` (a wrong type or a missing required field) is report
 One of `module`, `file`, or `run` is required.
 ```
 
+### PATH order of install directories
+
+Steps that install tools (`CreateVEnv`, `WestInstall`, `ScoopInstall`, `PoksInstall`) add their directories to the PATH of the steps that follow. Lower orders come first in PATH. `CreateVEnv` uses order 0, the other steps use 50. Set `install_dirs_order` in the step `config` to change a step's order without changing the step:
+
+```yaml
+- step: ScoopInstall
+  module: pypeline.steps.scoop_install
+  config:
+    install_dirs_order: 10  # before the other installers, after the virtual environment
+```
+
 ## Step Types
 
 ### Module Step
