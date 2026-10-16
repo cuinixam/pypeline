@@ -1,12 +1,21 @@
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence
 
 from py_app_dev.core.data_registry import DataRegistry
 from py_app_dev.core.subprocess import SubprocessExecutor
 
 from .artifacts import ProjectArtifactsLocator
+
+DEFAULT_INSTALL_DIR_ORDER = 50
+
+
+@dataclass
+class InstallDir:
+    path: Path
+    # Lower orders come first in PATH
+    order: int = DEFAULT_INSTALL_DIR_ORDER
 
 
 @dataclass
@@ -14,6 +23,7 @@ class ExecutionContext:
     project_root_dir: Path
     # Keep track of all install directories, updated by any step for the subsequent steps
     install_dirs: List[Path] = field(default_factory=list)
+    _install_dir_orders: Dict[Path, int] = field(default_factory=dict, init=False, repr=False)
     # Data registry to exchange data of any type
     data_registry: DataRegistry = field(default_factory=DataRegistry)
     # Inputs provided for the pipeline run
@@ -24,17 +34,17 @@ class ExecutionContext:
     def get_input(self, name: str) -> Optional[Any]:
         return self.inputs.get(name, None)
 
-    def add_install_dirs(self, install_dirs: List[Path], prepend: bool = False) -> None:
-        """
-        Register directories to be added to the PATH of the subsequent steps.
-
-        prepend: place these directories ahead of the ones registered by earlier steps,
-        so that their PATH precedence does not depend on the pipeline step order.
-        """
-        if prepend:
-            self.install_dirs[:0] = install_dirs
-        else:
-            self.install_dirs.extend(install_dirs)
+    def add_install_dirs(self, install_dirs: Sequence[Path | InstallDir]) -> None:
+        """Register directories to be added to the PATH of the subsequent steps. A plain path gets the default order."""
+        for install_dir in install_dirs:
+            if not isinstance(install_dir, InstallDir):
+                install_dir = InstallDir(install_dir)
+            self.install_dirs.append(install_dir.path)
+            # A directory registered more than once keeps its lowest order, so a later registration cannot push it back
+            order = self._install_dir_orders.get(install_dir.path, install_dir.order)
+            self._install_dir_orders[install_dir.path] = min(order, install_dir.order)
+        # The sort is stable, so directories with the same order keep their registration order
+        self.install_dirs.sort(key=lambda path: self._install_dir_orders.get(path, DEFAULT_INSTALL_DIR_ORDER))
 
     def add_env_vars(self, env_vars: Dict[str, Any]) -> None:
         self.env_vars.update(env_vars)

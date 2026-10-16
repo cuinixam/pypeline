@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from pypeline.domain.execution_context import ExecutionContext
+from pypeline.domain.execution_context import ExecutionContext, InstallDir
 
 
 def test_execution_context(project: Path) -> None:
@@ -40,15 +40,34 @@ def test_install_dirs_keep_call_order(project: Path) -> None:
     assert path.index("first") < path.index("second")
 
 
-def test_prepended_install_dirs_win_over_earlier_steps(project: Path) -> None:
+def test_lower_order_install_dirs_win_over_earlier_steps(project: Path) -> None:
     context = ExecutionContext(project_root_dir=project)
     # A tool installer (e.g. ScoopInstall) runs first and provides its own Python
     context.add_install_dirs([Path("scoop/apps/python311/current")])
     # The virtual environment is created afterwards but must still come first on PATH
-    context.add_install_dirs([Path(".venv/Scripts")], prepend=True)
+    context.add_install_dirs([InstallDir(Path(".venv/Scripts"), order=0)])
 
     path = context.create_process_env()["PATH"]
     assert path.index(".venv/Scripts") < path.index("python311")
+
+
+def test_install_dirs_with_same_order_keep_registration_order(project: Path) -> None:
+    context = ExecutionContext(project_root_dir=project)
+    context.add_install_dirs([Path("default")])
+    context.add_install_dirs([InstallDir(Path("A"), 13), InstallDir(Path("B"), 13)])
+    context.add_install_dirs([InstallDir(Path("first"), 0)])
+    context.add_install_dirs([InstallDir(Path("C"), 13)])
+
+    assert context.install_dirs == [Path("first"), Path("A"), Path("B"), Path("C"), Path("default")]
+
+
+def test_install_dir_registered_twice_keeps_its_lowest_order(project: Path) -> None:
+    context = ExecutionContext(project_root_dir=project)
+    context.add_install_dirs([Path("tool")])
+    context.add_install_dirs([InstallDir(Path(".venv/Scripts"), order=0)])
+    context.add_install_dirs([Path(".venv/Scripts")])
+
+    assert context.install_dirs == [Path(".venv/Scripts"), Path(".venv/Scripts"), Path("tool")]
 
 
 class SomeData:
