@@ -16,7 +16,7 @@ from py_app_dev.core.exceptions import UserNotificationException
 from py_app_dev.core.logging import logger
 
 from pypeline.bootstrap.run import get_bootstrap_script
-from pypeline.domain.execution_context import ExecutionContext, InstallDir
+from pypeline.domain.execution_context import ExecutionContext
 from pypeline.domain.pipeline import PipelineStep
 
 
@@ -430,7 +430,7 @@ class CreateVEnv(PipelineStep[ExecutionContext]):
     def update_execution_context(self) -> None:
         # The project virtual environment shall take precedence over tools installed by other steps,
         # independent of the order in which the steps run.
-        self.execution_context.add_install_dirs([InstallDir(path, order=0) for path in self.install_dirs])
+        self.add_install_dirs(self.install_dirs, order=0)
 
     def get_needs_dependency_management(self) -> bool:
         # Always return False - the bootstrap script handles dependency management internally

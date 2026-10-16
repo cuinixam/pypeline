@@ -604,8 +604,7 @@ def test_west_install_update_execution_context(west_execution_context: Mock) -> 
 
     west_execution_context.add_install_dirs.assert_called_once()
     call_args = west_execution_context.add_install_dirs.call_args[0][0]
-    assert Path("/path/to/lib1") in call_args
-    assert Path("/path/to/lib2") in call_args
+    assert [install_dir.path for install_dir in call_args] == dirs
 
 
 def test_west_install_update_execution_context_no_file(west_execution_context: Mock) -> None:

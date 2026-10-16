@@ -36,7 +36,7 @@ The architecture follows a clean separation of concerns with three main layers:
 
 **ExecutionContext** is the shared state container passed to all steps (see [pypeline-steps skill](.agent/skills/pypeline-steps/SKILL.md) for usage examples):
 
-- `install_dirs: List[Path]`: Binary directories automatically added in front of the subprocess PATH, sorted by order, lowest first (`add_install_dirs` takes a `Path`, default order 50, or an `InstallDir(path, order)`; `CreateVEnv` uses 0; same order keeps registration order)
+- `install_dirs: Tuple[Path, ...]`: Read-only. Binary directories automatically added in front of the subprocess PATH, each once, sorted by order, lowest first (register them with `add_install_dirs`, which takes a `Path`, default order 50, or an `InstallDir(path, order)`; `CreateVEnv` uses 0; same order keeps registration order). Steps call `PipelineStep.add_install_dirs`, which applies the `install_dirs_order` step config
 - `data_registry: DataRegistry`: Type-safe key-value store for arbitrary data exchange
 - `inputs: Dict[str, Any]`: User parameters from CLI (`-i key=value`) or config defaults
 - `env_vars: Dict[str, Any]`: Environment variables injected into all subprocess calls

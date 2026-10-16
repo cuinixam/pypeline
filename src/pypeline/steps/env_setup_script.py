@@ -72,12 +72,14 @@ class GenerateEnvSetupScript(PipelineStep[ExecutionContext]):
         # Get generate-all option and detect OS
         generate_all = self.execution_context.get_input("generate-all") or False
         is_windows = platform.system() == "Windows"
+        # The py_app_dev generators take a list, the execution context exposes a read-only tuple
+        install_dirs = list(self.execution_context.install_dirs)
 
         # Generate Windows scripts if on Windows OR generate-all is True
         if is_windows or generate_all:
             bat_script = self.output_dir.joinpath("env_setup.bat")
             BatEnvSetupScriptGenerator(
-                install_dirs=self.execution_context.install_dirs,
+                install_dirs=install_dirs,
                 environment=env_vars,
                 output_file=bat_script,
             ).to_file()
@@ -85,7 +87,7 @@ class GenerateEnvSetupScript(PipelineStep[ExecutionContext]):
 
             ps1_script = self.output_dir.joinpath("env_setup.ps1")
             Ps1EnvSetupScriptGenerator(
-                install_dirs=self.execution_context.install_dirs,
+                install_dirs=install_dirs,
                 environment=env_vars,
                 output_file=ps1_script,
             ).to_file()
@@ -95,7 +97,7 @@ class GenerateEnvSetupScript(PipelineStep[ExecutionContext]):
         if not is_windows or generate_all:
             sh_script = self.output_dir.joinpath("env_setup.sh")
             ShEnvSetupScriptGenerator(
-                install_dirs=self.execution_context.install_dirs,
+                install_dirs=install_dirs,
                 environment=env_vars,
                 output_file=sh_script,
             ).to_file()

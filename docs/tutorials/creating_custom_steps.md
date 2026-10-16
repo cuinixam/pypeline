@@ -87,7 +87,8 @@ class SetupStep(PipelineStep[ExecutionContext]):
   def update_execution_context(self) -> None:
     # Add tool directory to PATH for subsequent steps
     # Called even when step is skipped, so compute path deterministically
-    self.execution_context.add_install_dirs([self.tool_dir])
+    # Honors the install_dirs_order step config
+    self.add_install_dirs([self.tool_dir])
 ```
 
 Access shared data in later steps:

@@ -155,6 +155,6 @@ class ScoopInstall(PipelineStep[TContext], Generic[TContext]):
         if self._execution_info_file.exists():
             execution_info = ScoopInstallExecutionInfo.from_json_file(self._execution_info_file)
             unique_paths = list(dict.fromkeys(execution_info.install_dirs))
-            self.execution_context.add_install_dirs(unique_paths)
+            self.add_install_dirs(unique_paths)
             if execution_info.env_vars:
                 self.execution_context.add_env_vars(execution_info.env_vars)
