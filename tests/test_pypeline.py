@@ -11,6 +11,7 @@ from pypeline.domain.artifacts import ProjectArtifactsLocator
 from pypeline.domain.config import ProjectConfig, assemble_pipeline
 from pypeline.domain.execution_context import ExecutionContext
 from pypeline.domain.pipeline import PipelineConfig, PipelineStep, PipelineStepConfig, PipelineStepReference
+from pypeline.domain.project_slurper import ProjectSlurper
 from pypeline.pypeline import PipelineScheduler, PipelineStepsExecutor, RunCommandClassFactory
 from tests.conftest import assert_element_of_type
 
@@ -542,6 +543,12 @@ def test_include_cycle_raises(tmp_path: Path) -> None:
     (tmp_path / "b.pypeline.yaml").write_text("pipeline:\n  - include: a.pypeline.yaml\n")
     with pytest.raises(UserNotificationException, match="(?i)circular|cycle"):
         ProjectConfig.from_file(tmp_path / "a.pypeline.yaml")
+
+
+def test_missing_include_names_the_included_file(tmp_path: Path) -> None:
+    (tmp_path / "pypeline.yaml").write_text("pipeline:\n  - include: does_not_exist.yaml\n")
+    with pytest.raises(UserNotificationException, match=r"does_not_exist\.yaml.*not found.*pypeline\.yaml"):
+        ProjectSlurper(tmp_path)
 
 
 def test_include_path_is_relative_to_including_file(tmp_path: Path) -> None:
