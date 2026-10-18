@@ -42,8 +42,6 @@ class ProjectConfig(ConfigElement):
     @classmethod
     def _load(cls, config_file: Path, visited: Set[Path]) -> "ProjectConfig":
         """Load an included fragment. Unlike ``from_file`` it carries the include chain, to detect cycles."""
-        if not config_file.is_file():
-            raise FileNotFoundError(config_file)
         resolved = config_file.resolve()
         if resolved in visited:
             chain = " -> ".join(str(path) for path in (*visited, resolved))
@@ -90,7 +88,11 @@ def _expand_include(include: Union[str, IncludeSpec], including_file: Path, visi
     # A plain string includes the whole file; an IncludeSpec narrows it to named steps. Coerce to the
     # object form here so the rest reads one shape, without normalising the config's genuine union away.
     spec = include if isinstance(include, IncludeSpec) else IncludeSpec(file=include)
-    fragment = ProjectConfig._load(including_file.parent / spec.file, visited)
+    included_file = including_file.parent / spec.file
+    # Raise here, not as FileNotFoundError: callers map that to "<outer file> not found", which hides the missing include.
+    if not included_file.is_file():
+        raise UserNotificationException(f"Included pipeline file '{included_file}' not found (included from '{including_file}').")
+    fragment = ProjectConfig._load(included_file, visited)
     if isinstance(fragment.pipeline, OrderedDict):
         raise UserNotificationException(
             f"Included pipeline '{spec.file}' must define a flat list of steps (no groups) to be included from '{including_file}'."
