@@ -1,3 +1,4 @@
+import ensurepip
 import sys
 import textwrap
 import time
@@ -8,6 +9,7 @@ import pytest
 from py_app_dev.core.exceptions import UserNotificationException
 from typer.testing import CliRunner
 
+from pypeline.bootstrap.run import MIN_PIP_VERSION, Version
 from pypeline.domain.artifacts import ProjectArtifactsLocator
 from pypeline.main import __version__, app, package_version_file
 
@@ -220,6 +222,10 @@ def kickstart_files() -> List[str]:
     ]
 
 
+@pytest.mark.skipif(
+    Version(ensurepip.version()) < Version(MIN_PIP_VERSION),
+    reason=f"this Python bundles pip {ensurepip.version()}, the bootstrap requires {MIN_PIP_VERSION}",
+)
 def test_init_default(kickstart_files: List[str], tmp_path: Path) -> None:
     result = runner.invoke(app, ["init", "--project-dir", tmp_path.as_posix()])
     assert result.exit_code == 0
