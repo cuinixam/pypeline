@@ -2,7 +2,7 @@ pipeline:
     - step: CreateVEnv
       module: pypeline.steps.create_venv
       config:
-          package_manager: poetry==2.2.1
+          package_manager: poetry>=2.2
           python_version: "3.13"
     - step: GenerateEnvSetupScript
       module: pypeline.steps.env_setup_script
