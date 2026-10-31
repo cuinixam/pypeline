@@ -1,6 +1,6 @@
 [project]
 name = "pypeline-runner"
-version = "1.40.1"
+version = "1.40.2"
 description = "Configure and execute pipelines with Python (similar to GitHub workflows or Jenkins pipelines)."
 readme = "README.md"
 license = "MIT"
