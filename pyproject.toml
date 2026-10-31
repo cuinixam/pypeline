@@ -1,37 +1,32 @@
-[tool.poetry]
+[project]
 name = "pypeline-runner"
 version = "1.40.1"
 description = "Configure and execute pipelines with Python (similar to GitHub workflows or Jenkins pipelines)."
-authors = ["cuinixam <me@cuinixam.com>"]
-license = "MIT"
 readme = "README.md"
-repository = "https://github.com/cuinixam/pypeline"
-documentation = "https://pypeline-runner.readthedocs.io"
-classifiers = [
-    "Development Status :: 2 - Pre-Alpha",
-    "Intended Audience :: Developers",
-    "Natural Language :: English",
-    "Operating System :: OS Independent",
-    "Topic :: Software Development :: Libraries",
+license = "MIT"
+authors = [
+    { name = "cuinixam", email = "me@cuinixam.com" },
 ]
+requires-python = ">=3.10,<4.0"
+dependencies = [
+    "py-app-dev>=2.22,<3",
+    "typer>=0,<1",
+    "pyyaml>=6.0,<7",
+    "west>=1.5,<2",
+    "poks>=0,<1.0",
+]
+urls."Bug Tracker" = "https://github.com/cuinixam/pypeline/issues"
+urls.Changelog = "https://github.com/cuinixam/pypeline/blob/main/CHANGELOG.md"
+urls.Documentation = "https://pypeline-runner.readthedocs.io"
+urls.Repository = "https://github.com/cuinixam/pypeline"
+
+[project.scripts]
+pypeline = "pypeline.main:main"
+
+[tool.poetry]
 packages = [
     { include = "pypeline", from = "src" },
 ]
-
-[tool.poetry.scripts]
-pypeline = "pypeline.main:main"
-
-[tool.poetry.urls]
-"Bug Tracker" = "https://github.com/cuinixam/pypeline/issues"
-"Changelog" = "https://github.com/cuinixam/pypeline/blob/main/CHANGELOG.md"
-
-[tool.poetry.dependencies]
-python = "^3.10"
-py-app-dev = "^2.22"
-typer = "^0"
-pyyaml = "^6.0"
-west = "^1.5"
-poks = ">=0,<1.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^9.0"
@@ -49,7 +44,7 @@ sphinx-book-theme = "^1.1"
 sphinx-design = "^0"
 
 [tool.semantic_release]
-version_toml = ["pyproject.toml:tool.poetry.version"]
+version_toml = ["pyproject.toml:project.version"]
 version_variables = [
     "src/pypeline/__init__.py:__version__",
     "docs/conf.py:release",
@@ -162,5 +157,5 @@ module = "docs.*"
 ignore_errors = true
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
+requires = ["poetry-core>=2,<3"]
 build-backend = "poetry.core.masonry.api"
