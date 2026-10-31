@@ -4,7 +4,7 @@ This tutorial walks you through installing Pypeline and running your first pipel
 
 ## Prerequisites
 
-- Python 3.10 or higher
+- Python 3.11 or higher
 - [pipx](https://pipx.pypa.io/) (recommended) or pip
 
 ## Installation
