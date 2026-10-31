@@ -188,6 +188,10 @@ Creates a Python virtual environment.
 Prefer `python_version` over `python_executable`. The bootstrap environment is cached per Python `major.minor`; pinning `python_version` keeps that identity stable, while relying on a bare `python_executable` (e.g. `python3`) lets it drift with `PATH` between steps and rebuild needlessly. New projects from `pypeline init` pin `python_version` to the interpreter that created them.
 ```
 
+```{important}
+The bootstrap stops if the selected Python bundles a pip older than 26.2.2 in `ensurepip`. Older pip trusts the emSign root certificate that was removed after the [eMudhra/emSign CA incident](https://discuss.python.org/t/information-for-python-users-regarding-emudhra-emsign-ca-certificate-security-incident/109576). The python.org releases 3.13.17+ and 3.14.10+ bundle a fixed pip; no python.org 3.11 or 3.12 release does yet.
+```
+
 ### WestInstall
 
 Downloads multi-repo dependencies using [west](https://docs.zephyrproject.org/latest/develop/west/).

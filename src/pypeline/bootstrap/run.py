@@ -16,7 +16,6 @@ from enum import Enum
 from functools import total_ordering
 from pathlib import Path
 from typing import Any, List, Optional, Sequence, Tuple
-from urllib.parse import urlparse
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("bootstrap")
@@ -26,6 +25,7 @@ DEFAULT_PACKAGE_MANAGER = "poetry>=2.1.0"
 DEFAULT_BOOTSTRAP_PACKAGES = ["pip-system-certs>=4.0,<5.0"]
 BOOTSTRAP_COMPLETE_MARKER = ".bootstrap-complete"
 VENV_PYTHON_VERSION_MARKER = ".python_version"
+MIN_PIP_VERSION = "26.2.2"
 
 
 def get_bootstrap_script() -> Path:
@@ -509,22 +509,6 @@ class CreateBootstrapEnvironment(Runnable):
             packages_to_install = [self.config.package_manager, *self.config.bootstrap_packages]
             pip_args = ["install", *packages_to_install]
 
-            # Handle SSL certificates for older pip versions
-            if Version(ensurepip.version()) < Version("24.2"):
-                if pypi_source and (hostname := urlparse(pypi_source.url).hostname):
-                    pip_args.extend(["--trusted-host", hostname])
-                else:
-                    pip_args.extend(
-                        [
-                            "--trusted-host",
-                            "pypi.org",
-                            "--trusted-host",
-                            "pypi.python.org",
-                            "--trusted-host",
-                            "files.pythonhosted.org",
-                        ]
-                    )
-
             logger.info(f"Installing bootstrap packages: {packages_to_install}")
             bootstrap_venv.pip(pip_args)
 
@@ -790,6 +774,14 @@ def main() -> int:
             # Use CLI arguments for backward compatibility
             config = BootstrapConfig(
                 package_manager=args.package_manager,
+            )
+
+        bundled_pip_version = ensurepip.version()
+        if Version(bundled_pip_version) < Version(MIN_PIP_VERSION):
+            raise UserNotificationException(
+                f"Python {sys.version.split()[0]} bundles pip {bundled_pip_version}, but pip {MIN_PIP_VERSION} or newer is required.\n"
+                "Older pip trusts the emSign root certificate that was removed after the eMudhra/emSign CA incident.\n"
+                f"Use a Python release that bundles pip {MIN_PIP_VERSION} or newer, for example 3.13.17+ or 3.14.10+."
             )
 
         # Step 1: Create the bootstrap environment (shared cache)

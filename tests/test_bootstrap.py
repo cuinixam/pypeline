@@ -12,6 +12,7 @@ from pypeline.bootstrap.run import (
     PyPiSource,
     PyPiSourceParser,
     instantiate_os_specific_venv,
+    main,
 )
 
 
@@ -328,3 +329,18 @@ def test_get_inputs_includes_python_executable(tmp_path: Path) -> None:
     inputs = env.get_inputs()
 
     assert Path(os.path.realpath(sys.executable)) in inputs
+
+
+@pytest.mark.parametrize("bundled_pip_version, expected_exit_code", [("26.2.1", 1), ("26.2.2", 0)])
+def test_main_requires_fixed_pip_in_ensurepip(tmp_path: Path, bundled_pip_version: str, expected_exit_code: int) -> None:
+    config_file = tmp_path / "bootstrap.json"
+    config_file.write_text(f'{{"bootstrap_cache_dir": "{(tmp_path / "bootstrap_cache").as_posix()}"}}')
+
+    with (
+        patch("pypeline.bootstrap.run.ensurepip.version", return_value=bundled_pip_version),
+        patch("pypeline.bootstrap.run.Executor.execute", return_value=0) as execute,
+        patch.object(sys, "argv", ["bootstrap.py", "--project-dir", str(tmp_path), "--config", str(config_file)]),
+    ):
+        assert main() == expected_exit_code
+
+    assert execute.called == (expected_exit_code == 0)
