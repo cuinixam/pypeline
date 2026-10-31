@@ -14,7 +14,7 @@ pipeline {
         axes {
           axis {
             name 'PYTHON_VERSION'
-            values '3.10', '3.13'
+            values '3.11', '3.13'
           }
           axis {
             name 'PLATFORM'

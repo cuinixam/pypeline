@@ -7,7 +7,7 @@ license = "MIT"
 authors = [
     { name = "cuinixam", email = "me@cuinixam.com" },
 ]
-requires-python = ">=3.10,<4.0"
+requires-python = ">=3.11,<4.0"
 dependencies = [
     "py-app-dev>=2.22,<3",
     "typer>=0,<1",
