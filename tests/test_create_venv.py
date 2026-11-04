@@ -397,6 +397,7 @@ def test_get_all_properties_names_returns_all_fields() -> None:
         "bootstrap_packages",
         "bootstrap_cache_dir",
         "venv_install_command",
+        "bootstrap_venv",
     }
 
 
@@ -412,6 +413,7 @@ def test_get_all_properties_names_with_exclusions() -> None:
         "bootstrap_packages",
         "bootstrap_cache_dir",
         "venv_install_command",
+        "bootstrap_venv",
     }
     assert set(properties) == expected_properties
 
@@ -543,3 +545,47 @@ def test_missing_custom_script_merges_bootstrap_json_with_user_config(execution_
     saved_config = CreateVEnvConfig.from_json_file(bootstrap_config_file)
     assert saved_config.python_version == "3.10"  # From bootstrap.json
     assert saved_config.python_package_manager == "uv>=0.6"  # From user config (overridden)
+
+
+@pytest.mark.parametrize(
+    ("package_manager", "version_output", "expected_commands"),
+    [
+        ("uv>=0.6", "uv 0.13.7 (Homebrew 2026-11-03)", [["/bin/uv", "sync", "--python", sys.executable, "--no-managed-python", "--no-python-downloads"]]),
+        ("poetry>=2.1", "Poetry (version 2.2.1)", [["/bin/poetry", "env", "use", sys.executable], ["/bin/poetry", "install"]]),
+    ],
+    ids=["uv", "poetry"],
+)
+def test_create_venv_without_bootstrap_venv_runs_package_manager_from_path(
+    execution_context: Mock, package_manager: str, version_output: str, expected_commands: list[list[str]]
+) -> None:
+    create_venv = CreateVEnv(execution_context, "group_name", {"python_package_manager": package_manager, "bootstrap_venv": False})
+    with (
+        patch("pypeline.steps.create_venv.shutil.which", side_effect=lambda name: f"/bin/{name}"),
+        patch("pypeline.steps.create_venv.subprocess.run", return_value=Mock(stdout=version_output)),
+    ):
+        create_venv.run()
+
+    assert [call.args[0] for call in execution_context.create_process_executor.call_args_list] == expected_commands
+    assert not (execution_context.project_root_dir / ".bootstrap").exists()
+
+
+@pytest.mark.parametrize(
+    ("package_manager", "executable", "version_output", "expected_error"),
+    [
+        ("pipenv", "/bin/pipenv", "pipenv, version 2024.0.1", "supports uv and poetry"),
+        ("uv>=0.6", None, "", "uv is not in PATH"),
+        ("uv>=0.6", "/bin/uv", "uv 0.5.1", "uv 0.5.1 is installed, but the configuration requires uv>=0.6"),
+        ("uv>=0", "/bin/uv", "uv 0.13.3", "update uv to 0.13.4 or newer"),
+    ],
+    ids=["unsupported", "not-in-path", "version-mismatch", "uv-trusts-emsign"],
+)
+def test_create_venv_without_bootstrap_venv_stops(execution_context: Mock, package_manager: str, executable: str | None, version_output: str, expected_error: str) -> None:
+    create_venv = CreateVEnv(execution_context, "group_name", {"python_package_manager": package_manager, "bootstrap_venv": False})
+    with (
+        patch("pypeline.steps.create_venv.shutil.which", return_value=executable),
+        patch("pypeline.steps.create_venv.subprocess.run", return_value=Mock(stdout=version_output)),
+        pytest.raises(UserNotificationException, match=expected_error),
+    ):
+        create_venv.run()
+
+    execution_context.create_process_executor.assert_not_called()

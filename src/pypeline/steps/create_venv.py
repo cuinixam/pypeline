@@ -12,12 +12,17 @@ from typing import Any, ClassVar, Dict, List, Optional
 
 from mashumaro.config import TO_DICT_ADD_OMIT_NONE_FLAG, BaseConfig
 from mashumaro.mixins.json import DataClassJSONMixin
+from packaging.requirements import Requirement
+from packaging.version import Version
 from py_app_dev.core.exceptions import UserNotificationException
 from py_app_dev.core.logging import logger
 
 from pypeline.bootstrap.run import get_bootstrap_script
 from pypeline.domain.execution_context import ExecutionContext
 from pypeline.domain.pipeline import PipelineStep
+
+# uv 0.13.4 removed the compromised emSign root from its certificate store
+MIN_UV_VERSION = "0.13.4"
 
 
 @dataclass
@@ -32,6 +37,8 @@ class CreateVEnvConfig(DataClassJSONMixin):
     bootstrap_packages: Optional[List[str]] = None
     bootstrap_cache_dir: Optional[str] = None
     venv_install_command: Optional[str] = None
+    # False runs the package manager found in PATH instead of installing it in a bootstrap environment
+    bootstrap_venv: Optional[bool] = None
 
     class Config(BaseConfig):
         """Base configuration for JSON serialization with omitted None values."""
@@ -325,6 +332,9 @@ class CreateVEnv(PipelineStep[ExecutionContext]):
 
     def run(self) -> int:
         self.logger.debug(f"Run {self.get_name()} step. Output dir: {self.output_dir}")
+        if self.user_config.bootstrap_venv is False:
+            self._run_package_manager_from_path()
+            return 0
         bootstrap_config = CreateVEnvConfig()
         is_managed = False
         # Determine target script and mode
@@ -362,7 +372,7 @@ class CreateVEnv(PipelineStep[ExecutionContext]):
             # Create bootstrap.json with all configuration
             # Populate config dynamically from CreateVEnvConfig fields
             # excluding internal/local fields like bootstrap_script/python_executable
-            for field_name in self.user_config.get_all_properties_names(["bootstrap_script", "python_executable"]):
+            for field_name in self.user_config.get_all_properties_names(["bootstrap_script", "python_executable", "bootstrap_venv"]):
                 val = getattr(self.user_config, field_name)
                 if val is not None:
                     setattr(bootstrap_config, field_name, val)
@@ -417,6 +427,39 @@ class CreateVEnv(PipelineStep[ExecutionContext]):
             ).execute()
 
         return 0
+
+    def _run_package_manager_from_path(self) -> None:
+        """Without a bootstrap environment the Python's bundled pip is never used, so old Pythons work too."""
+        name = self.package_manager_name
+        if name not in ("uv", "poetry"):
+            raise UserNotificationException(f"bootstrap_venv: false supports uv and poetry, not {name}.")
+        executable = shutil.which(name)
+        if not executable:
+            raise UserNotificationException(f"{name} is not in PATH. Install it or remove 'bootstrap_venv: false' to let the bootstrap install it.")
+        self._check_package_manager_version(executable)
+        python = self.python_executable
+        if name == "uv":
+            command: List[str | Path] = [executable, "sync", "--python", python, "--no-managed-python", "--no-python-downloads"]
+        else:
+            self.execution_context.add_env_vars({"POETRY_VIRTUALENVS_IN_PROJECT": "true"})
+            self.execution_context.create_process_executor([executable, "env", "use", python], cwd=self.project_root_dir).execute()
+            command = [executable, "install"]
+        if self.user_config.venv_install_command:
+            command = list(self.user_config.venv_install_command.split())
+        else:
+            command.extend(self.user_config.python_package_manager_args or [])
+        self.execution_context.create_process_executor(command, cwd=self.project_root_dir).execute()
+
+    def _check_package_manager_version(self, executable: str) -> None:
+        requirement = Requirement(self.package_manager)
+        output = subprocess.run([executable, "--version"], capture_output=True, text=True, check=False).stdout  # noqa: S603
+        match = re.search(r"\d+(\.\d+)+", output)
+        if not match:
+            raise UserNotificationException(f"Could not read the {requirement.name} version from '{output.strip()}'.")
+        if not requirement.specifier.contains(match.group(0), prereleases=True):
+            raise UserNotificationException(f"{requirement.name} {match.group(0)} is installed, but the configuration requires {self.package_manager}.")
+        if requirement.name == "uv" and Version(match.group(0)) < Version(MIN_UV_VERSION):
+            raise UserNotificationException(f"uv {match.group(0)} trusts the compromised emSign root certificate. Please update uv to {MIN_UV_VERSION} or newer.")
 
     def get_inputs(self) -> List[Path]:
         return []

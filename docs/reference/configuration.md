@@ -175,6 +175,7 @@ Creates a Python virtual environment.
 | `python_executable` | string | — | Path to Python (legacy; prefer `python_version`) |
 | `python_package_manager` | string | `uv>=0.6` | Package manager |
 | `bootstrap_script` | string | — | Custom bootstrap script |
+| `bootstrap_venv` | bool | `true` | Install the package manager in a bootstrap environment |
 
 ```yaml
 - step: CreateVEnv
@@ -191,6 +192,25 @@ Prefer `python_version` over `python_executable`. The bootstrap environment is c
 ```{important}
 The bootstrap stops if the selected Python bundles a pip older than 26.2.2 in `ensurepip`. Older pip trusts the emSign root certificate that was removed after the [eMudhra/emSign CA incident](https://discuss.python.org/t/information-for-python-users-regarding-emudhra-emsign-ca-certificate-security-incident/109576). The python.org releases 3.13.17+ and 3.14.10+ bundle a fixed pip; no python.org 3.11 or 3.12 release does yet.
 ```
+
+#### Without a bootstrap environment
+
+With `bootstrap_venv: false`, `CreateVEnv` does not create a bootstrap environment. It runs the package manager it finds in `PATH` and does not use the pip bundled with Python, so the pip check above does not apply. Use it for Pythons that bundle an old pip, for example 3.11 and 3.12.
+
+```yaml
+- step: CreateVEnv
+  module: pypeline.steps.create_venv
+  config:
+    python_version: "3.11"
+    python_package_manager: uv>=0.6
+    bootstrap_venv: false
+```
+
+- Only `uv` and `poetry` are supported. You install them yourself, for example uv with `brew install uv` on macOS, the `curl -LsSf https://astral.sh/uv/install.sh | sh` installer on Ubuntu, `winget install astral-sh.uv` on Windows, or the `astral-sh/setup-uv` GitHub action in CI.
+- The step first checks that the installed version matches `python_package_manager` and stops if it does not. It also stops for uv older than 0.13.4, the first release that removed the emSign root from uv's own certificate store.
+- Poetry downloads with the `certifi` package installed next to it, so the Poetry version does not tell whether it trusts the emSign root. Make sure that environment has `certifi` 2026.10.19 or newer, for example with `pipx upgrade poetry` or `pipx inject poetry "certifi>=2026.10.19"`.
+- uv runs `uv sync --python <python>`. Poetry runs `poetry env use <python>` and then `poetry install`, with the virtual environment in `.venv`.
+- `python_package_manager_args` and `venv_install_command` work as with the bootstrap environment.
 
 ### WestInstall
 
