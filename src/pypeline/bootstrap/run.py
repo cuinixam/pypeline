@@ -570,7 +570,7 @@ class CreateVirtualEnvironment(Runnable):
         Check if the existing venv was created with the same Python version.
 
         If the Python version has changed (e.g., switching branches), delete the
-        existing venv so it can be recreated by the package manager.
+        contents of the existing venv so it can be recreated by the package manager.
         If skip_venv_delete is True, log a warning instead of deleting.
         """
         if not self.venv_dir.exists():
@@ -585,23 +585,40 @@ class CreateVirtualEnvironment(Runnable):
                 logger.info(
                     f"No Python version marker found in {self.venv_dir}. "
                     f"This venv may have been created before version tracking was added. "
-                    f"Deleting {self.venv_dir} to ensure clean state."
+                    f"Deleting the contents of {self.venv_dir} to ensure clean state."
                 )
-                shutil.rmtree(self.venv_dir)
+                self._clear_venv_dir()
             return
 
         try:
             stored_version = self.python_version_marker.read_text().strip()
-            if stored_version != current_version:
-                if self.skip_venv_delete:
-                    logger.warning(
-                        f"Python version changed from {stored_version} to {current_version}. Skipping venv deletion as requested - dependencies will be updated in place."
-                    )
-                else:
-                    logger.info(f"Python version changed from {stored_version} to {current_version}. Deleting {self.venv_dir} for recreation.")
-                    shutil.rmtree(self.venv_dir)
         except OSError as exc:
             logger.warning(f"Could not read Python version marker: {exc}")
+            return
+
+        if stored_version == current_version:
+            return
+        if self.skip_venv_delete:
+            logger.warning(
+                f"Python version changed from {stored_version} to {current_version}. Skipping venv deletion as requested - dependencies will be updated in place."
+            )
+            return
+        logger.info(f"Python version changed from {stored_version} to {current_version}. Deleting the contents of {self.venv_dir} for recreation.")
+        self._clear_venv_dir()
+
+    def _clear_venv_dir(self) -> None:
+        """Delete the contents of the venv but keep the directory, because it can be a mount point (e.g. a Docker or Podman volume)."""
+        try:
+            for entry in self.venv_dir.iterdir():
+                if entry.is_dir() and not entry.is_symlink():
+                    shutil.rmtree(entry)
+                else:
+                    entry.unlink()
+        except OSError as exc:
+            raise UserNotificationException(
+                f"Could not delete the contents of the virtual environment {self.venv_dir}: {exc}. "
+                "Close all programs that use it (for example a running python.exe or the IDE) and run again, or delete its contents manually."
+            ) from exc
 
     def _write_python_version_marker(self, version: str) -> None:
         """Write the Python version marker to track the venv's Python version."""
