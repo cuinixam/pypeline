@@ -1,4 +1,6 @@
+import errno
 import os
+import shutil
 import sys
 from pathlib import Path
 from unittest.mock import Mock, call, patch
@@ -11,6 +13,7 @@ from pypeline.bootstrap.run import (
     CreateVirtualEnvironment,
     PyPiSource,
     PyPiSourceParser,
+    UserNotificationException,
     instantiate_os_specific_venv,
     main,
 )
@@ -287,37 +290,70 @@ def test_ensure_correct_python_version_sets_env_vars(
 
 
 @pytest.mark.parametrize(
-    "skip_venv_delete, marker_exists, stored_version, expect_rmtree_called",
+    "skip_venv_delete, stored_version, expect_emptied",
     [
-        pytest.param(False, True, "3.10.0", True, id="delete_on_version_mismatch"),
-        pytest.param(True, True, "3.10.0", False, id="skip_delete_on_version_mismatch"),
-        pytest.param(False, False, None, True, id="delete_when_no_marker"),
-        pytest.param(True, False, None, False, id="skip_delete_when_no_marker"),
-        pytest.param(False, True, f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}", False, id="no_delete_when_version_matches"),
+        pytest.param(False, "3.10.0", True, id="delete_on_version_mismatch"),
+        pytest.param(True, "3.10.0", False, id="skip_delete_on_version_mismatch"),
+        pytest.param(False, None, True, id="delete_when_no_marker"),
+        pytest.param(True, None, False, id="skip_delete_when_no_marker"),
+        pytest.param(False, f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}", False, id="no_delete_when_version_matches"),
     ],
 )
-def test_check_python_version_compatibility_respects_skip_venv_delete(
+def test_check_python_version_compatibility_empties_venv_without_removing_it(
     tmp_path: Path,
     skip_venv_delete: bool,
-    marker_exists: bool,
     stored_version: str | None,
-    expect_rmtree_called: bool,
+    expect_emptied: bool,
 ) -> None:
     project_dir = tmp_path / "project"
-    project_dir.mkdir(parents=True)
     venv_dir = project_dir / ".venv"
-    venv_dir.mkdir(parents=True)
-    marker_file = venv_dir / ".python_version"
-    if marker_exists and stored_version:
-        marker_file.write_text(stored_version)
+    (venv_dir / "lib").mkdir(parents=True)
+    (venv_dir / "lib" / "module.py").write_text("")
+    (venv_dir / "pyvenv.cfg").write_text("")
+    if stored_version:
+        (venv_dir / ".python_version").write_text(stored_version)
 
     config = BootstrapConfig(package_manager="uv>=0.6")
     bootstrap_env = CreateBootstrapEnvironment(config, project_dir)
     create_venv = CreateVirtualEnvironment(project_dir, bootstrap_env, skip_venv_delete=skip_venv_delete)
 
-    with patch("pypeline.bootstrap.run.shutil.rmtree") as mock_rmtree:
+    real_rmtree = shutil.rmtree
+
+    def rmtree_refusing_mount_point(path: Path) -> None:
+        if Path(path) == venv_dir:
+            raise OSError(errno.EBUSY, "Device or resource busy", str(path))
+        real_rmtree(path)
+
+    with patch("pypeline.bootstrap.run.shutil.rmtree", side_effect=rmtree_refusing_mount_point):
         create_venv._check_python_version_compatibility()
-        assert mock_rmtree.called == expect_rmtree_called
+
+    assert venv_dir.is_dir()
+    assert (not any(venv_dir.iterdir())) == expect_emptied
+
+
+@pytest.mark.parametrize(
+    "stored_version",
+    [
+        pytest.param(None, id="no_marker"),
+        pytest.param("3.10.0", id="version_mismatch"),
+    ],
+)
+def test_check_python_version_compatibility_reports_failed_venv_deletion(tmp_path: Path, stored_version: str | None) -> None:
+    project_dir = tmp_path / "project"
+    venv_dir = project_dir / ".venv"
+    (venv_dir / "lib").mkdir(parents=True)
+    if stored_version:
+        (venv_dir / ".python_version").write_text(stored_version)
+
+    config = BootstrapConfig(package_manager="uv>=0.6")
+    bootstrap_env = CreateBootstrapEnvironment(config, project_dir)
+    create_venv = CreateVirtualEnvironment(project_dir, bootstrap_env)
+
+    with (
+        patch("pypeline.bootstrap.run.shutil.rmtree", side_effect=PermissionError("python.exe is in use")),
+        pytest.raises(UserNotificationException, match="Could not delete the contents of the virtual environment"),
+    ):
+        create_venv._check_python_version_compatibility()
 
 
 def test_get_inputs_includes_python_executable(tmp_path: Path) -> None:
