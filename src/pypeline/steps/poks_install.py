@@ -9,7 +9,7 @@ from py_app_dev.core.exceptions import UserNotificationException
 from py_app_dev.core.logging import logger
 
 from ..domain.execution_context import ExecutionContext
-from ..domain.pipeline import PipelineStep
+from ..domain.pipeline import PipelineStep, manifest_output_subdir
 from ..main import package_version_file
 
 
@@ -29,6 +29,8 @@ class PoksInstallConfig(BaseConfigJSONMixin):
 
     #: Relative path from project root for poks installation directory (will have .poks appended)
     install_dir: str | None = None
+    #: Relative path from project root to the poks manifest (defaults to poks.json)
+    manifest_file: str | None = None
 
 
 class PoksManifestFile(ConfigFile[_PoksConfig]):
@@ -39,11 +41,12 @@ TContext = TypeVar("TContext", bound=ExecutionContext)
 
 
 class PoksInstall(PipelineStep[TContext], Generic[TContext]):
-    def __init__(self, execution_context: TContext, group_name: str, config: dict[str, Any] | None = None) -> None:
+    def __init__(self, execution_context: TContext, group_name: str | None, config: dict[str, Any] | None = None) -> None:
         super().__init__(execution_context, group_name, config)
         self.logger = logger.bind()
         self.execution_info = PoksInstallExecutionInfo()
         self.user_config = PoksInstallConfig.from_dict(config) if config else PoksInstallConfig()
+        self._output_subdir = manifest_output_subdir(self.user_config.manifest_file)
         self._manifest_files = self._collect_manifests()
 
     def get_name(self) -> str:
@@ -53,7 +56,13 @@ class PoksInstall(PipelineStep[TContext], Generic[TContext]):
         config: dict[str, str] = {}
         if self.user_config.install_dir:
             config["install_dir"] = self.user_config.install_dir
+        if self.user_config.manifest_file:
+            config["manifest_file"] = self.user_config.manifest_file
         return config if config else None
+
+    @property
+    def output_dir(self) -> Path:
+        return super().output_dir / self._output_subdir
 
     @property
     def install_dirs(self) -> list[Path]:
@@ -71,7 +80,9 @@ class PoksInstall(PipelineStep[TContext], Generic[TContext]):
 
     @property
     def _source_config_file(self) -> Path:
-        """Source poks.json. Override to customize."""
+        """Source poks.json. Uses the configured path if set. Override to customize."""
+        if self.user_config.manifest_file:
+            return self.project_root_dir / self.user_config.manifest_file
         return self.project_root_dir / "poks.json"
 
     def _resolve_root_dir(self) -> Path:
@@ -118,6 +129,9 @@ class PoksInstall(PipelineStep[TContext], Generic[TContext]):
 
     def run(self) -> int:
         self.logger.debug(f"Run {self.get_name()} step. Output dir: {self.output_dir}")
+
+        if self.user_config.manifest_file and not self._source_config_file.exists():
+            raise UserNotificationException(f"Poks manifest file not found: {self._source_config_file}")
 
         try:
             collected = self._merge_manifests()

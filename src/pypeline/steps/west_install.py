@@ -1,4 +1,3 @@
-import hashlib
 import io
 import json
 import re
@@ -16,7 +15,7 @@ from py_app_dev.core.logging import logger
 
 from ..domain.execution_context import ExecutionContext
 from ..domain.external_project import ExternalProject
-from ..domain.pipeline import PipelineStep
+from ..domain.pipeline import PipelineStep, manifest_output_subdir
 from ..main import package_version_file
 
 
@@ -118,11 +117,12 @@ TContext = TypeVar("TContext", bound=ExecutionContext)
 
 
 class WestInstall(PipelineStep[TContext], Generic[TContext]):
-    def __init__(self, execution_context: TContext, group_name: str, config: dict[str, Any] | None = None) -> None:
+    def __init__(self, execution_context: TContext, group_name: str | None, config: dict[str, Any] | None = None) -> None:
         super().__init__(execution_context, group_name, config)
         self.logger = logger.bind()
         self.install_result = WestInstallResult()
         self.user_config = WestInstallConfig.from_dict(config) if config else WestInstallConfig()
+        self._output_subdir = manifest_output_subdir(self.user_config.manifest_file)
 
         self._west_workspace_dir = self._resolve_workspace_dir()
         self._manifest_files = self._collect_manifests()
@@ -177,12 +177,9 @@ class WestInstall(PipelineStep[TContext], Generic[TContext]):
     def get_name(self) -> str:
         return self.__class__.__name__
 
-    def get_id(self) -> str:
-        """Return unique identifier for dependency tracking (.deps.json filename)."""
-        if self.user_config.manifest_file:
-            manifest_hash = hashlib.md5(self.user_config.manifest_file.encode(), usedforsecurity=False).hexdigest()[:8]
-            return f"{self.get_name()}_{manifest_hash}"
-        return self.get_name()
+    @property
+    def output_dir(self) -> Path:
+        return super().output_dir / self._output_subdir
 
     def get_config(self) -> dict[str, str] | None:
         config: dict[str, str] = {}
@@ -254,6 +251,9 @@ class WestInstall(PipelineStep[TContext], Generic[TContext]):
 
     def run(self) -> int:
         self.logger.debug(f"Run {self.get_name()} step. Output dir: {self.output_dir}")
+
+        if self.user_config.manifest_file and not self._source_manifest_file.exists():
+            raise UserNotificationException(f"West manifest file not found: {self._source_manifest_file}")
 
         try:
             merged_manifest = self._merge_manifests()

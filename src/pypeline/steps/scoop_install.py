@@ -9,7 +9,7 @@ from py_app_dev.core.logging import logger
 from py_app_dev.core.scoop_wrapper import ScoopFileElement, ScoopWrapper
 
 from ..domain.execution_context import ExecutionContext
-from ..domain.pipeline import PipelineStep
+from ..domain.pipeline import PipelineStep, manifest_output_subdir
 from ..main import package_version_file
 
 
@@ -23,6 +23,14 @@ class ScoopManifest(BaseConfigJSONMixin):
 
 class ScoopManifestFile(ConfigFile[ScoopManifest]):
     pass
+
+
+@dataclass
+class ScoopInstallConfig(BaseConfigJSONMixin):
+    """Configuration for ScoopInstall step."""
+
+    #: Relative path from project root to the scoop manifest (defaults to scoopfile.json)
+    manifest_file: str | None = None
 
 
 @dataclass
@@ -47,14 +55,25 @@ TContext = TypeVar("TContext", bound=ExecutionContext)
 
 
 class ScoopInstall(PipelineStep[TContext], Generic[TContext]):
-    def __init__(self, execution_context: TContext, group_name: str, config: dict[str, Any] | None = None) -> None:
+    def __init__(self, execution_context: TContext, group_name: str | None, config: dict[str, Any] | None = None) -> None:
         super().__init__(execution_context, group_name, config)
         self.logger = logger.bind()
         self.execution_info = ScoopInstallExecutionInfo()
+        self.user_config = ScoopInstallConfig.from_dict(config) if config else ScoopInstallConfig()
+        self._output_subdir = manifest_output_subdir(self.user_config.manifest_file)
         self._manifest_files = self._collect_manifests()
 
     def get_name(self) -> str:
         return self.__class__.__name__
+
+    def get_config(self) -> dict[str, str] | None:
+        if self.user_config.manifest_file:
+            return {"manifest_file": self.user_config.manifest_file}
+        return None
+
+    @property
+    def output_dir(self) -> Path:
+        return super().output_dir / self._output_subdir
 
     @property
     def install_dirs(self) -> list[Path]:
@@ -72,7 +91,9 @@ class ScoopInstall(PipelineStep[TContext], Generic[TContext]):
 
     @property
     def _source_manifest_file(self) -> Path:
-        """Source scoopfile.json. Override to customize."""
+        """Source scoopfile.json. Uses the configured path if set. Override to customize."""
+        if self.user_config.manifest_file:
+            return self.project_root_dir / self.user_config.manifest_file
         return self.project_root_dir / "scoopfile.json"
 
     def _collect_manifests(self) -> list[ScoopManifestFile]:
@@ -108,6 +129,9 @@ class ScoopInstall(PipelineStep[TContext], Generic[TContext]):
 
     def run(self) -> int:
         self.logger.debug(f"Run {self.get_name()} step. Output dir: {self.output_dir}")
+
+        if self.user_config.manifest_file and not self._source_manifest_file.exists():
+            raise UserNotificationException(f"Scoop manifest file not found: {self._source_manifest_file}")
 
         if platform.system() != "Windows":
             self.logger.warning(f"ScoopInstall step is only supported on Windows. Skipping. Current platform: {platform.system()}")

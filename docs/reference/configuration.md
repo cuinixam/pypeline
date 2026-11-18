@@ -218,7 +218,7 @@ Downloads multi-repo dependencies using [west](https://docs.zephyrproject.org/la
 
 | Config | Type | Default | Description |
 |--------|------|---------|-------------|
-| `manifest_file` | string | `west.yaml` | Relative path to west manifest file |
+| `manifest_file` | string | `west.yaml` | Relative path to west manifest file (see [a second manifest](#installing-from-a-second-manifest)) |
 | `workspace_dir` | string | `build/` | Relative path for west workspace directory |
 | `revision_scoped_paths` | bool | `false` | Nest each dependency under a revision subdirectory |
 
@@ -256,14 +256,14 @@ Installs Windows applications via [Scoop](https://scoop.sh/).
 
 | Config | Type | Default | Description |
 |--------|------|---------|-------------|
-| — | — | — | No configuration options |
+| `manifest_file` | string | `scoopfile.json` | Relative path to the scoop manifest (see [a second manifest](#installing-from-a-second-manifest)) |
 
 ```yaml
 - step: ScoopInstall
   module: pypeline.steps.scoop_install
 ```
 
-Dependencies are read from `scoopfile.json` in the project root. Like `WestInstall`, the step supports multiple manifest sources: it collects every `ScoopManifestFile` registered in the data registry, and subclasses can override `_collect_manifests()` to contribute more. The collection order defines the override order, like git config files: the root `scoopfile.json` is the base, and a later source's bucket or app with the same name overrides the earlier definition. Every collected manifest file is tracked as a step input.
+Dependencies are read from `scoopfile.json` in the project root, or from `manifest_file`. Like `WestInstall`, the step supports multiple manifest sources: it collects every `ScoopManifestFile` registered in the data registry, and subclasses can override `_collect_manifests()` to contribute more. The collection order defines the override order, like git config files: the root `scoopfile.json` is the base, and a later source's bucket or app with the same name overrides the earlier definition. Every collected manifest file is tracked as a step input.
 
 ```{warning}
 Windows only. Logs a warning and skips on other platforms.
@@ -276,6 +276,7 @@ Installs tools cross-platform via [poks](https://github.com/cuinixam/poks) (a sc
 | Config | Type | Default | Description |
 |--------|------|---------|-------------|
 | `install_dir` | string | `~/.poks` | Relative path from project root for the poks installation directory (`.poks` is appended) |
+| `manifest_file` | string | `poks.json` | Relative path to the poks manifest (see [a second manifest](#installing-from-a-second-manifest)) |
 
 ```yaml
 - step: PoksInstall
@@ -284,7 +285,26 @@ Installs tools cross-platform via [poks](https://github.com/cuinixam/poks) (a sc
     install_dir: build/tools
 ```
 
-Dependencies are read from `poks.json` in the project root. The step supports multiple config sources: it collects every `PoksManifestFile` registered in the data registry, and subclasses can override `_collect_manifests()` to contribute more. The collection order defines the override order, like git config files: the root `poks.json` is the base, and a later source's bucket or app with the same name overrides the earlier definition. Every collected config file is tracked as a step input.
+Dependencies are read from `poks.json` in the project root, or from `manifest_file`. The step supports multiple config sources: it collects every `PoksManifestFile` registered in the data registry, and subclasses can override `_collect_manifests()` to contribute more. The collection order defines the override order, like git config files: the root `poks.json` is the base, and a later source's bucket or app with the same name overrides the earlier definition. Every collected config file is tracked as a step input.
+
+### Installing from a second manifest
+
+`WestInstall`, `ScoopInstall` and `PoksInstall` accept `manifest_file`, so one pipeline can install from two manifests, for example tools that only CI needs. Declare a second step of the same class with `class_name`:
+
+```yaml
+- step: ScoopInstall
+  module: pypeline.steps.scoop_install
+- step: ScoopInstallOptional
+  module: pypeline.steps.scoop_install
+  class_name: ScoopInstall
+  config:
+    manifest_file: scoopfile-optional.json
+```
+
+- A step with `manifest_file` keeps its run record and generated files in a subfolder named after the manifest (`build/scoopfile-optional/` here), so the two steps do not overwrite each other's files and each one is skipped when its manifest has not changed. A step without `manifest_file` keeps its usual folder.
+- `manifest_file` must be a relative path inside the project.
+- A configured `manifest_file` that does not exist stops the step with an error. Without `manifest_file`, a missing default manifest means there is nothing to install.
+- Manifests that earlier steps register in the data registry are merged into every step of that class, whichever manifest it reads.
 
 ### GenerateEnvSetupScript
 

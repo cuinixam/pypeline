@@ -4,6 +4,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 from py_app_dev.core.exceptions import UserNotificationException
+from py_app_dev.core.runnable import Executor
 from py_app_dev.core.scoop_wrapper import InstalledScoopApp, ScoopFileElement, ScoopWrapper
 
 from pypeline.domain.execution_context import ExecutionContext
@@ -288,3 +289,54 @@ def test_scoop_install_tracks_app_dir_without_adding_to_path(tmp_path: Path) -> 
     # ...but it is not propagated as an install dir, so it never lands on PATH.
     scoop_install.update_execution_context()
     assert app_dir not in exec_context.install_dirs
+
+
+def test_scoop_install_reads_the_configured_manifest_file(tmp_path: Path) -> None:
+    (tmp_path / "scoopfile.json").write_text(json.dumps({"apps": [{"Name": "git", "Source": "main"}]}))
+    (tmp_path / "scoopfile-optional.json").write_text(json.dumps({"apps": [{"Name": "polyspace", "Source": "extras"}]}))
+    scoop_install = ScoopInstall(ExecutionContext(project_root_dir=tmp_path), "install", {"manifest_file": "scoopfile-optional.json"})
+
+    assert [app.name for app in scoop_install._merge_manifests().apps] == ["polyspace"]
+    assert scoop_install.get_config() == {"manifest_file": "scoopfile-optional.json"}
+
+
+def test_scoop_install_uses_an_output_folder_named_after_the_configured_manifest(tmp_path: Path) -> None:
+    exec_context = ExecutionContext(project_root_dir=tmp_path)
+    default = ScoopInstall(exec_context, "install")
+    optional = ScoopInstall(exec_context, "install", {"manifest_file": "tools/scoopfile-optional.json"})
+
+    assert optional.output_dir == default.output_dir / "tools" / "scoopfile-optional"
+    # Without manifest_file nothing changes, so existing run records stay valid.
+    assert default.get_config() is None
+
+
+@pytest.mark.parametrize("manifest_file", ["../scoopfile.json", Path.cwd().anchor + "scoopfile.json"])
+def test_scoop_install_rejects_a_manifest_file_outside_the_project(tmp_path: Path, manifest_file: str) -> None:
+    with pytest.raises(UserNotificationException, match="manifest_file"):
+        ScoopInstall(ExecutionContext(project_root_dir=tmp_path), "install", {"manifest_file": manifest_file})
+
+
+def test_scoop_install_raises_when_the_configured_manifest_file_is_missing(tmp_path: Path) -> None:
+    scoop_install = ScoopInstall(ExecutionContext(project_root_dir=tmp_path), "install", {"manifest_file": "scoopfile-optional.json"})
+
+    with pytest.raises(UserNotificationException, match=r"scoopfile-optional\.json"):
+        scoop_install.run()
+
+
+def test_two_scoop_install_steps_with_different_manifests_skip_on_the_second_run(tmp_path: Path) -> None:
+    """Regression for #18: two steps of the same class must not share their run record or generated files."""
+    (tmp_path / "scoopfile.json").write_text(json.dumps({"apps": [{"Name": "git", "Source": "main"}]}))
+    (tmp_path / "scoopfile-optional.json").write_text(json.dumps({"apps": [{"Name": "polyspace", "Source": "extras"}]}))
+    exec_context = ExecutionContext(project_root_dir=tmp_path)
+    wrapper = Mock(spec=ScoopWrapper)
+    wrapper.install.return_value = []
+
+    with patch("pypeline.steps.scoop_install.platform.system", return_value="Windows"):
+        with patch("pypeline.steps.scoop_install.create_scoop_wrapper", return_value=wrapper):
+            for _ in range(2):
+                # No group name: a flat pipeline file puts both steps in the same build folder.
+                for config in (None, {"manifest_file": "scoopfile-optional.json"}):
+                    step = ScoopInstall(exec_context, None, config)
+                    Executor(step.output_dir).execute(step)
+
+    assert wrapper.install.call_count == 2

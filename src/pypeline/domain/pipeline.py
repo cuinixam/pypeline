@@ -245,3 +245,18 @@ class PipelineStep(Generic[TExecutionContext], Runnable):
     def get_needs_dependency_management(self) -> bool:
         """If false, the step executor will not check for outdated dependencies. This is useful for steps consisting of command lines which shall always run."""
         return True
+
+
+def manifest_output_subdir(manifest_file: Optional[str]) -> Path:
+    """
+    Output subfolder for an install step that reads ``manifest_file``.
+
+    Two steps of the same class with different manifests otherwise share their run record and generated files,
+    so each run overwrites the other's and both reinstall every time. Without a manifest the step keeps its folder.
+    """
+    if not manifest_file:
+        return Path()
+    path = Path(manifest_file)
+    if path.is_absolute() or ".." in path.parts:
+        raise UserNotificationException(f"manifest_file must be a relative path inside the project, got '{manifest_file}'.")
+    return path.with_suffix("")
