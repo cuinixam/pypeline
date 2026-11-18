@@ -7,6 +7,7 @@ import pytest
 import yaml
 from py_app_dev.core.data_registry import DataRegistry
 from py_app_dev.core.exceptions import UserNotificationException
+from py_app_dev.core.runnable import Executor
 
 from pypeline.domain.artifacts import ProjectArtifactsLocator
 from pypeline.domain.execution_context import ExecutionContext
@@ -316,11 +317,26 @@ def test_west_install_get_id_default(west_execution_context: Mock) -> None:
     assert step.get_id() == "WestInstall"
 
 
-def test_west_install_get_id_with_config(west_execution_context: Mock) -> None:
-    config = {"manifest_file": "deps/west.yaml"}
-    step = WestInstall(west_execution_context, "group_name", config)
-    assert step.get_id().startswith("WestInstall_")
-    assert step.get_id() != "WestInstall"
+def test_west_install_uses_an_output_folder_named_after_the_configured_manifest(west_execution_context: Mock) -> None:
+    default = WestInstall(west_execution_context, "group_name")
+    step = WestInstall(west_execution_context, "group_name", {"manifest_file": "deps/west.yaml"})
+
+    assert step.output_dir == default.output_dir / "deps" / "west"
+    # The subfolder keeps the run record apart, so the id stays the class name.
+    assert step.get_id() == "WestInstall"
+
+
+@pytest.mark.parametrize("manifest_file", ["../west.yaml", Path.cwd().anchor + "west.yaml"])
+def test_west_install_rejects_a_manifest_file_outside_the_project(west_execution_context: Mock, manifest_file: str) -> None:
+    with pytest.raises(UserNotificationException, match="manifest_file"):
+        WestInstall(west_execution_context, "group_name", {"manifest_file": manifest_file})
+
+
+def test_west_install_raises_when_the_configured_manifest_file_is_missing(west_execution_context: Mock) -> None:
+    step = WestInstall(west_execution_context, "group_name", {"manifest_file": "west-optional.yaml"})
+
+    with pytest.raises(UserNotificationException, match=r"west-optional\.yaml"):
+        step.run()
 
 
 def test_west_install_no_manifests_skips(west_execution_context: Mock) -> None:
@@ -1100,3 +1116,22 @@ manifest:
     step = CustomWestInstall(custom_context, "group_name")
 
     assert assert_element_of_type(step._manifests, WestManifest).projects[0].name == "dep1"
+
+
+def test_two_west_install_steps_with_different_manifests_skip_on_the_second_run(west_execution_context: Mock, project: Path) -> None:
+    """Regression for #18: two steps of the same class must not share their run record or generated files."""
+    manifest = (
+        "manifest:\n  remotes:\n    - name: origin\n      url-base: https://github.com/org\n"
+        "  projects:\n    - name: {name}\n      remote: origin\n      revision: v1.0.0\n      path: modules/{name}\n"
+    )
+    (project / "west.yaml").write_text(manifest.format(name="zephyr"))
+    (project / "west-optional.yaml").write_text(manifest.format(name="cmsis"))
+
+    for _ in range(2):
+        # No group name: a flat pipeline file puts both steps in the same build folder.
+        for config in (None, {"manifest_file": "west-optional.yaml"}):
+            step = WestInstall(west_execution_context, None, config)
+            Executor(step.output_dir).execute(step)
+
+    # west init + west update for each step on the first round only.
+    assert west_execution_context.create_process_executor.call_count == 4

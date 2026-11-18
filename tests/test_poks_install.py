@@ -1,10 +1,11 @@
 import json
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from poks.domain import PoksApp, PoksConfig
 from py_app_dev.core.exceptions import UserNotificationException
+from py_app_dev.core.runnable import Executor
 
 from pypeline.domain.execution_context import ExecutionContext
 from pypeline.main import package_version_file
@@ -254,3 +255,50 @@ def test_poks_install_get_config_without_install_dir(tmp_path: Path) -> None:
     result = poks_install.get_config()
 
     assert result is None
+
+
+def test_poks_install_reads_the_configured_manifest_file(tmp_path: Path) -> None:
+    (tmp_path / "poks.json").write_text(json.dumps({"apps": [{"name": "cmake", "version": "1.0.0", "bucket": "main"}]}))
+    (tmp_path / "poks-optional.json").write_text(json.dumps({"apps": [{"name": "polyspace", "version": "1.0.0", "bucket": "main"}]}))
+    poks_install = PoksInstall(ExecutionContext(project_root_dir=tmp_path), "install", {"manifest_file": "poks-optional.json"})
+
+    assert [app.name for app in poks_install._merge_manifests().apps] == ["polyspace"]
+    assert poks_install.get_config() == {"manifest_file": "poks-optional.json"}
+
+
+def test_poks_install_uses_an_output_folder_named_after_the_configured_manifest(tmp_path: Path) -> None:
+    exec_context = ExecutionContext(project_root_dir=tmp_path)
+    default = PoksInstall(exec_context, "install")
+    optional = PoksInstall(exec_context, "install", {"manifest_file": "tools/poks-optional.json"})
+
+    assert optional.output_dir == default.output_dir / "tools" / "poks-optional"
+
+
+@pytest.mark.parametrize("manifest_file", ["../poks.json", Path.cwd().anchor + "poks.json"])
+def test_poks_install_rejects_a_manifest_file_outside_the_project(tmp_path: Path, manifest_file: str) -> None:
+    with pytest.raises(UserNotificationException, match="manifest_file"):
+        PoksInstall(ExecutionContext(project_root_dir=tmp_path), "install", {"manifest_file": manifest_file})
+
+
+def test_poks_install_raises_when_the_configured_manifest_file_is_missing(tmp_path: Path) -> None:
+    poks_install = PoksInstall(ExecutionContext(project_root_dir=tmp_path), "install", {"manifest_file": "poks-optional.json"})
+
+    with pytest.raises(UserNotificationException, match=r"poks-optional\.json"):
+        poks_install.run()
+
+
+def test_two_poks_install_steps_with_different_manifests_skip_on_the_second_run(tmp_path: Path) -> None:
+    """Regression for #18: two steps of the same class must not share their run record or generated files."""
+    (tmp_path / "poks.json").write_text(json.dumps({"apps": [{"name": "cmake", "version": "1.0.0", "bucket": "main"}]}))
+    (tmp_path / "poks-optional.json").write_text(json.dumps({"apps": [{"name": "polyspace", "version": "1.0.0", "bucket": "main"}]}))
+    exec_context = ExecutionContext(project_root_dir=tmp_path)
+
+    with patch("pypeline.steps.poks_install.Poks") as poks_class:
+        poks_class.return_value.install.return_value = MagicMock(apps=[], dirs=[], env={})
+        for _ in range(2):
+            # No group name: a flat pipeline file puts both steps in the same build folder.
+            for config in (None, {"manifest_file": "poks-optional.json"}):
+                step = PoksInstall(exec_context, None, config)
+                Executor(step.output_dir).execute(step)
+
+    assert poks_class.return_value.install.call_count == 2
